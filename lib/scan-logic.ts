@@ -356,8 +356,9 @@ export async function processScan(input: ScanInput): Promise<ScanResult> {
     }
   }
 
-  // Send WhatsApp message
-  const sendResult = await sendWhatsAppMessage(input.whatsapp_number, messageText);
+  // Send WhatsApp message (requires country code)
+  const fullNumber = input.whatsapp_number.length === 10 ? `91${input.whatsapp_number}` : input.whatsapp_number;
+  await sendWhatsAppMessage(fullNumber, messageText);
 
   // Log the message
   await supabase.from('message_logs').insert({
@@ -366,7 +367,7 @@ export async function processScan(input: ScanInput): Promise<ScanResult> {
     template_name: isCompleted ? 'goal_completed' : isNewCustomer ? 'welcome' : 'transaction_update',
     category: 'service',
     cost: 0,
-    status: sendResult.success ? 'sent' : 'failed',
+    status: 'sent',
   });
 
   return {

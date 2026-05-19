@@ -24,13 +24,6 @@ export default function ScanPage() {
   const [birthDay, setBirthDay] = useState('');
   const [isReturning, setIsReturning] = useState(false);
 
-  // Result
-  const [result, setResult] = useState<{
-    message: string;
-    isCompleted: boolean;
-    claimCode?: string;
-    progress: { current: number; target: number; percentage: number; daysRemaining: number };
-  } | null>(null);
 
   useEffect(() => {
     validateToken();
@@ -110,7 +103,6 @@ export default function ScanPage() {
       const data = await response.json();
 
       if (data.success) {
-        setResult(data);
         setState('success');
       } else {
         setErrorMsg(data.message || 'Something went wrong');
@@ -122,12 +114,13 @@ export default function ScanPage() {
     }
   };
 
-  // Open WhatsApp with pre-filled message (service window hack)
+  // Open WhatsApp with pre-filled message
   const openWhatsApp = () => {
     const businessNumber = process.env.NEXT_PUBLIC_WHATSAPP_BUSINESS_NUMBER || '';
     const waUrl = `https://wa.me/${businessNumber}?text=TXN-${token}`;
     window.open(waUrl, '_blank');
-    // Also process via API
+    
+    // Process API to save profile, then show success state
     handleConfirm();
   };
 
@@ -323,90 +316,35 @@ export default function ScanPage() {
         )}
 
         {/* SUCCESS */}
-        {state === 'success' && result && (
+        {state === 'success' && (
           <div className="slide-up" style={{ textAlign: 'center' }}>
             <div
               style={{
                 width: '80px',
                 height: '80px',
                 borderRadius: '50%',
-                background: result.isCompleted
-                  ? 'rgba(245, 158, 11, 0.15)'
-                  : 'rgba(16, 185, 129, 0.15)',
+                background: 'rgba(16, 185, 129, 0.15)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '2.5rem',
                 margin: '0 auto 1.5rem',
-                border: `2px solid ${result.isCompleted ? 'var(--warning)' : 'var(--primary)'}`,
+                border: '2px solid var(--primary)',
               }}
             >
-              {result.isCompleted ? '🎉' : '✅'}
+              💬
             </div>
 
             <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.5rem' }}>
-              {result.isCompleted ? 'Goal Completed!' : 'Transaction Logged!'}
+              Check your WhatsApp!
             </h2>
-
-            {result.isCompleted && result.claimCode && (
-              <div
-                className="card"
-                style={{
-                  marginBottom: '1.5rem',
-                  borderColor: 'rgba(245, 158, 11, 0.3)',
-                  textAlign: 'center',
-                }}
-              >
-                <p style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                  Your Claim Code
-                </p>
-                <div
-                  style={{
-                    fontSize: '2rem',
-                    fontWeight: 800,
-                    color: 'var(--warning)',
-                    letterSpacing: '0.05em',
-                  }}
-                >
-                  {result.claimCode}
-                </div>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
-                  Show this code at the shop to claim your reward!
-                </p>
-              </div>
-            )}
-
-            {!result.isCompleted && (
-              <div className="card" style={{ marginBottom: '1.5rem' }}>
-                <div style={{ marginBottom: '0.75rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                      Progress
-                    </span>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
-                      {result.progress.percentage}%
-                    </span>
-                  </div>
-                  <div className="progress-bar">
-                    <div
-                      className="progress-fill"
-                      style={{ width: `${result.progress.percentage}%` }}
-                    />
-                  </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                  <span>
-                    {campaign?.campaign_type === 'amount'
-                      ? `${formatCurrency(result.progress.current)} / ${formatCurrency(result.progress.target)}`
-                      : `${result.progress.current} / ${result.progress.target} visits`}
-                  </span>
-                  <span>{result.progress.daysRemaining} days left</span>
-                </div>
-              </div>
-            )}
+            
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+              We have sent your progress update directly to your phone.
+            </p>
 
             <div className="alert alert-success" style={{ justifyContent: 'center' }}>
-              💬 Check WhatsApp for your confirmation message
+              ✅ You can now close this page
             </div>
           </div>
         )}

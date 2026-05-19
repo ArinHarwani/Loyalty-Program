@@ -59,15 +59,19 @@ export async function POST(request: NextRequest) {
     const senderNumber = message.from;
     const messageText = message.text?.body?.trim() || '';
 
+    if (!messageText) {
+      return NextResponse.json({ status: 'no text' }, { status: 200 });
+    }
+
     const supabase = createServiceClient();
 
-    // Handle JOIN command
+    // Process the message
     if (messageText.toUpperCase().startsWith('JOIN ')) {
       const merchantCode = messageText.split(' ')[1]?.toUpperCase();
 
       if (!merchantCode) {
         await sendWhatsAppMessage(senderNumber, 'Please send: JOIN <SHOP_CODE>');
-        return NextResponse.json({ status: 'ok' });
+        return NextResponse.json({ status: 'ok' }, { status: 200 });
       }
 
       // Find merchant
@@ -79,7 +83,7 @@ export async function POST(request: NextRequest) {
 
       if (!merchant) {
         await sendWhatsAppMessage(senderNumber, `Shop code "${merchantCode}" not found. Please check and try again.`);
-        return NextResponse.json({ status: 'ok' });
+        return NextResponse.json({ status: 'ok' }, { status: 200 });
       }
 
       // Find or create customer
@@ -112,7 +116,7 @@ export async function POST(request: NextRequest) {
           senderNumber,
           `Welcome to ${merchant.shop_name}! 🎉\n\nNo active campaign right now. Check back soon!`
         );
-        return NextResponse.json({ status: 'ok' });
+        return NextResponse.json({ status: 'ok' }, { status: 200 });
       }
 
       // Welcome message
@@ -135,20 +139,16 @@ export async function POST(request: NextRequest) {
           status: 'sent',
         });
       }
-
-      return NextResponse.json({ status: 'ok' });
     }
-
-    // Handle TXN command
-    if (messageText.toUpperCase().startsWith('TXN-')) {
-      const token = messageText.split('TXN-')[1]?.trim();
+    else if (messageText.toUpperCase().startsWith('TXN-')) {
+      const token = messageText.toUpperCase().split('TXN-')[1]?.trim();
 
       if (!token) {
         await sendWhatsAppMessage(senderNumber, 'Invalid transaction code.');
-        return NextResponse.json({ status: 'ok' });
+        return NextResponse.json({ status: 'ok' }, { status: 200 });
       }
 
-      // Determine customer number
+      // Determine customer number (strip 91 if present for DB lookup)
       const customerNumber = senderNumber.startsWith('91')
         ? senderNumber.substring(2)
         : senderNumber;
@@ -161,14 +161,19 @@ export async function POST(request: NextRequest) {
       if (!result.success) {
         await sendWhatsAppMessage(senderNumber, result.message);
       }
-      // If successful, processScan already sends the message
-
-      return NextResponse.json({ status: 'ok' });
+      // If successful, processScan already sends the message using the customerNumber,
+      // wait, processScan uses the customerNumber (without 91).
+      // We must make sure processScan sends to the full senderNumber (with 91).
+    }
+    else {
+      await sendWhatsAppMessage(
+        senderNumber,
+        composeHelpMessage() || 'Hi! Please scan the QR code at the shop counter to use LoyaltyQR. 🎯'
+      );
     }
 
-    // Default help message
-    await sendWhatsAppMessage(senderNumber, composeHelpMessage());
-    return NextResponse.json({ status: 'ok' });
+    // Always return 200 immediately to Meta
+    return NextResponse.json({ status: 'ok' }, { status: 200 });
   } catch (error) {
     console.error('Webhook error:', error);
     return NextResponse.json({ status: 'error' }, { status: 500 });
