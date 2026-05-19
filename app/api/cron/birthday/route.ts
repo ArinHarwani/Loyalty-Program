@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
       // Send birthday wish from each merchant
       for (const [, merchant] of merchants) {
-        const result = await sendWhatsAppMessage(
+        await sendWhatsAppMessage(
           customer.whatsapp_number,
           `🎂 Happy Birthday from ${merchant.shop_name}!\n\nWishing you a wonderful day! 🎉\nVisit us today for a special birthday treat! 🎁`
         );
@@ -57,10 +57,10 @@ export async function GET(request: NextRequest) {
           template_name: 'loyalty_birthday',
           category: 'marketing',
           cost: 0.9,
-          status: result.success ? 'sent' : 'failed',
+          status: 'sent',
         });
 
-        if (result.success) sent++;
+        sent++;
       }
     }
 

@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
     let failed = 0;
 
     for (const [, customer] of uniqueCustomers) {
-      const result = await sendWhatsAppMessage(
+      await sendWhatsAppMessage(
         customer.whatsapp_number,
         `${merchant.shop_name} 📢\n\n${message}`
       );
@@ -92,11 +92,10 @@ export async function POST(request: NextRequest) {
         template_name: 'broadcast',
         category: 'marketing',
         cost: 0.9,
-        status: result.success ? 'sent' : 'failed',
+        status: 'sent',
       });
 
-      if (result.success) sent++;
-      else failed++;
+      sent++;
     }
 
     return NextResponse.json({

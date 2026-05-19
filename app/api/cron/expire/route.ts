@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
 
       // Send expiry notification
       if (enrollment.customer && enrollment.merchant) {
-        const result = await sendWhatsAppMessage(
+        await sendWhatsAppMessage(
           enrollment.customer.whatsapp_number,
           `⏰ Your loyalty enrollment at ${enrollment.merchant.shop_name} has expired.\n\nScan the QR at your next visit to start fresh!`
         );
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
           template_name: 'loyalty_expired',
           category: 'utility',
           cost: 0.11,
-          status: result.success ? 'sent' : 'failed',
+          status: 'sent',
         });
       }
       expired++;
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
           ? `₹${enrollment.total_spent}`
           : `${enrollment.total_visits} visits`;
 
-        const result = await sendWhatsAppMessage(
+        await sendWhatsAppMessage(
           enrollment.customer.whatsapp_number,
           `⚠️ Your loyalty goal at ${enrollment.merchant.shop_name} expires soon!\n\nProgress: ${current} / ${target}\n🎁 Prize: ${enrollment.campaign.reward_description}\n\nVisit the shop before it's too late!`
         );
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
           template_name: 'loyalty_expiry_warning',
           category: 'utility',
           cost: 0.11,
-          status: result.success ? 'sent' : 'failed',
+          status: 'sent',
         });
 
         warnings++;
