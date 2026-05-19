@@ -28,49 +28,67 @@ export async function middleware(request: NextRequest) {
     request: { headers: request.headers },
   });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          response = NextResponse.next({
-            request: { headers: request.headers },
-          });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // Protect /merchant/* routes
-  if (pathname.startsWith('/merchant') && !user) {
-    return NextResponse.redirect(new URL('/merchant/login', request.url));
-  }
-
-  // Protect /admin/* routes
-  if (pathname.startsWith('/admin')) {
-    if (!user) {
-      return NextResponse.redirect(new URL('/merchant/login', request.url));
-    }
-    if (user.email !== process.env.ADMIN_EMAIL) {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    console.error('Middleware Error: Supabase env vars are missing.');
+    // If we're missing env vars, just redirect away from protected routes to avoid 500 errors
+    if (pathname.startsWith('/merchant') || pathname.startsWith('/admin')) {
       return NextResponse.redirect(new URL('/', request.url));
     }
+    return response;
   }
 
-  return response;
+  try {
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) =>
+              request.cookies.set(name, value)
+            );
+            response = NextResponse.next({
+              request: { headers: request.headers },
+            });
+            cookiesToSet.forEach(({ name, value, options }) =>
+              response.cookies.set(name, value, options)
+            );
+          },
+        },
+      }
+    );
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    // Protect /merchant/* routes
+    if (pathname.startsWith('/merchant') && !user) {
+      return NextResponse.redirect(new URL('/merchant/login', request.url));
+    }
+
+    // Protect /admin/* routes
+    if (pathname.startsWith('/admin')) {
+      if (!user) {
+        return NextResponse.redirect(new URL('/merchant/login', request.url));
+      }
+      if (user.email !== process.env.ADMIN_EMAIL) {
+        return NextResponse.redirect(new URL('/', request.url));
+      }
+    }
+
+    return response;
+  } catch (error) {
+    console.error('Middleware execution error:', error);
+    // If the middleware crashes (e.g., Supabase error), fail gracefully
+    if (pathname.startsWith('/merchant') || pathname.startsWith('/admin')) {
+      return NextResponse.redirect(new URL('/', request.url));
+    }
+    return response;
+  }
 }
 
 export const config = {
