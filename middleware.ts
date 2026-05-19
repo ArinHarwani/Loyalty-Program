@@ -1,93 +1,88 @@
-// ============================================================
-// LoyaltyQR — Middleware (Auth Protection)
-// ============================================================
-
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Public routes — no auth needed
+  // 1. Skip middleware for public routes completely to prevent unnecessary edge execution
   if (
     pathname === '/' ||
     pathname.startsWith('/scan') ||
     pathname.startsWith('/progress') ||
-    pathname.startsWith('/api/whatsapp') ||
-    pathname.startsWith('/api/cron') ||
+    pathname.startsWith('/api') ||
     pathname.startsWith('/merchant/login') ||
+    pathname.startsWith('/merchant/onboarding') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon')
   ) {
     return NextResponse.next();
   }
 
-  // Create Supabase client with cookie-based auth
-  let response = NextResponse.next({
-    request: { headers: request.headers },
-  });
+  // 2. We are now in a protected route context (/merchant/* or /admin/*)
+  // Check if env vars are present before creating the Supabase client
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    console.error('Middleware Error: Supabase env vars are missing.');
-    // If we're missing env vars, just redirect away from protected routes to avoid 500 errors
-    if (pathname.startsWith('/merchant') || pathname.startsWith('/admin')) {
-      return NextResponse.redirect(new URL('/', request.url));
-    }
-    return response;
+  if (!supabaseUrl || !supabaseKey) {
+    // Missing env vars, redirect to home to avoid 500 error
+    console.error('Missing Supabase environment variables in Vercel');
+    return NextResponse.redirect(new URL('/', request.url));
   }
 
   try {
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll();
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value }) =>
-              request.cookies.set(name, value)
-            );
-            response = NextResponse.next({
-              request: { headers: request.headers },
-            });
-            cookiesToSet.forEach(({ name, value, options }) =>
-              response.cookies.set(name, value, options)
-            );
-          },
+    let supabaseResponse = NextResponse.next({
+      request: {
+        headers: request.headers,
+      },
+    });
+
+    const supabase = createServerClient(supabaseUrl, supabaseKey, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
         },
-      }
-    );
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value }) => {
+              request.cookies.set(name, value);
+            });
+          } catch (e) {
+            // Edge runtime may throw when mutating request cookies. This is a known Next.js quirk.
+            // We can safely ignore it because we're setting it on the response below.
+          }
+          
+          supabaseResponse = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          });
+          
+          cookiesToSet.forEach(({ name, value, options }) => {
+            supabaseResponse.cookies.set(name, value, options);
+          });
+        },
+      },
+    });
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    // 3. Verify user authentication
+    const { data: { user } } = await supabase.auth.getUser();
 
-    // Protect /merchant/* routes
-    if (pathname.startsWith('/merchant') && !user) {
-      return NextResponse.redirect(new URL('/merchant/login', request.url));
-    }
-
-    // Protect /admin/* routes
+    // 4. Handle Routing logic
     if (pathname.startsWith('/admin')) {
+      if (!user || user.email !== process.env.ADMIN_EMAIL) {
+        return NextResponse.redirect(new URL('/', request.url));
+      }
+    } else if (pathname.startsWith('/merchant')) {
       if (!user) {
         return NextResponse.redirect(new URL('/merchant/login', request.url));
       }
-      if (user.email !== process.env.ADMIN_EMAIL) {
-        return NextResponse.redirect(new URL('/', request.url));
-      }
     }
 
-    return response;
+    return supabaseResponse;
   } catch (error) {
     console.error('Middleware execution error:', error);
-    // If the middleware crashes (e.g., Supabase error), fail gracefully
-    if (pathname.startsWith('/merchant') || pathname.startsWith('/admin')) {
-      return NextResponse.redirect(new URL('/', request.url));
-    }
-    return response;
+    // Graceful fallback
+    return NextResponse.redirect(new URL('/', request.url));
   }
 }
 
