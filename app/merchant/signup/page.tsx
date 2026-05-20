@@ -5,23 +5,34 @@ import { createClient } from '@/lib/supabase';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-export default function MerchantLoginPage() {
+export default function MerchantSignupPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) return;
+    if (!email || !password || !confirmPassword) return;
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
 
     setLoading(true);
     setError('');
 
     try {
       const supabase = createClient();
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      const { error: authError } = await supabase.auth.signUp({
         email,
         password,
       });
@@ -30,8 +41,8 @@ export default function MerchantLoginPage() {
         setError(authError.message);
         setLoading(false);
       } else {
-        // Successful login, redirect to dashboard
-        router.push('/merchant/dashboard');
+        // Successful signup, redirect to onboarding to set up shop details
+        router.push('/merchant/onboarding');
       }
     } catch {
       setError('Something went wrong. Please try again.');
@@ -48,16 +59,16 @@ export default function MerchantLoginPage() {
       <div className="container-sm" style={{ paddingTop: '4rem' }}>
         <div className="card slide-up" style={{ padding: '2.5rem' }}>
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-            <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>🔐</div>
+            <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>✨</div>
             <h1 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.25rem' }}>
-              Merchant Login
+              Create Merchant Account
             </h1>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-              Welcome back to your dashboard
+              Start your loyalty program today
             </p>
           </div>
 
-          <form onSubmit={handleLogin}>
+          <form onSubmit={handleSignup}>
             <div style={{ marginBottom: '1.25rem' }}>
               <label className="label">Email Address</label>
               <input
@@ -71,7 +82,7 @@ export default function MerchantLoginPage() {
               />
             </div>
 
-            <div style={{ marginBottom: '1.5rem' }}>
+            <div style={{ marginBottom: '1.25rem' }}>
               <label className="label">Password</label>
               <input
                 type="password"
@@ -80,6 +91,20 @@ export default function MerchantLoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                minLength={6}
+              />
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label className="label">Confirm Password</label>
+              <input
+                type="password"
+                className="input"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                minLength={6}
               />
             </div>
 
@@ -92,14 +117,14 @@ export default function MerchantLoginPage() {
             <button
               type="submit"
               className="btn btn-primary btn-full btn-lg"
-              disabled={loading || !email || !password}
+              disabled={loading || !email || !password || !confirmPassword}
             >
               {loading ? (
                 <>
-                  <span className="spinner" /> Signing in...
+                  <span className="spinner" /> Creating Account...
                 </>
               ) : (
-                'Sign In'
+                'Sign Up'
               )}
             </button>
           </form>
@@ -112,9 +137,9 @@ export default function MerchantLoginPage() {
               fontSize: '0.9rem',
             }}
           >
-            Don&apos;t have an account?{' '}
-            <Link href="/merchant/signup" style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }}>
-              Sign up here
+            Already have an account?{' '}
+            <Link href="/merchant/login" style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }}>
+              Sign in here
             </Link>
           </p>
         </div>

@@ -72,10 +72,15 @@ export default function ScanPage() {
       // Check localStorage for returning customer (per-merchant key)
       const merchantId = qrToken.merchant?.id;
       if (merchantId) {
-        const saved = localStorage.getItem(`wnum_${merchantId}`);
-        if (saved && isValidIndianPhone(saved)) {
-          setWhatsappNumber(saved);
-          setIsReturning(true);
+        try {
+          const saved = localStorage.getItem(`wnum_${merchantId}`);
+          if (saved && isValidIndianPhone(saved)) {
+            setWhatsappNumber(saved);
+            setIsReturning(true);
+          }
+        } catch (e) {
+          // Ignore localStorage errors (e.g., Safari Private Mode)
+          console.warn('localStorage is not available', e);
         }
       }
 
@@ -143,7 +148,11 @@ export default function ScanPage() {
 
       if (data.success) {
         // Save to localStorage (per-merchant)
-        localStorage.setItem(`wnum_${data.merchant_id}`, whatsappNumber);
+        try {
+          localStorage.setItem(`wnum_${data.merchant_id}`, whatsappNumber);
+        } catch (e) {
+          console.warn('localStorage is not available', e);
+        }
 
         // Switch to redirecting state
         setState('redirecting');
@@ -270,7 +279,11 @@ export default function ScanPage() {
                         cancelAutoSubmit();
                         setIsReturning(false);
                         setWhatsappNumber('');
-                        localStorage.removeItem(`wnum_${merchant.id}`);
+                        try {
+                          localStorage.removeItem(`wnum_${merchant.id}`);
+                        } catch (e) {
+                          console.warn('localStorage is not available', e);
+                        }
                       }}
                       style={{
                         background: 'none',
