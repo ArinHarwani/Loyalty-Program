@@ -84,8 +84,7 @@ export default function TransactionPage() {
       }
 
       // Generate QR code
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-      const scanUrl = `${appUrl}/scan/${newToken}`;
+      const scanUrl = `${window.location.origin}/scan/${newToken}`;
       const dataUrl = await QRCode.toDataURL(scanUrl, {
         width: 300,
         margin: 2,
