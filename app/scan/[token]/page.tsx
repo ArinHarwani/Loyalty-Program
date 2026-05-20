@@ -10,7 +10,7 @@ type PageState = 'loading' | 'error' | 'form' | 'redirecting';
 
 export default function ScanPage() {
   const params = useParams();
-  const token = params.token as string;
+  const token = params?.token as string;
 
   const [state, setState] = useState<PageState>('loading');
   const [merchant, setMerchant] = useState<Merchant | null>(null);
@@ -32,9 +32,11 @@ export default function ScanPage() {
 
   // Validate token on mount
   useEffect(() => {
-    validateToken();
+    if (token) {
+      validateToken();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [token]);
 
   const validateToken = async () => {
     try {
