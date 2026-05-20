@@ -40,31 +40,16 @@ export default function ScanPage() {
 
   const validateToken = async () => {
     try {
-      const supabase = createClient();
-      const { data: qrToken, error } = await supabase
-        .from('qr_tokens')
-        .select('*, merchant:merchants(*), campaign:campaigns(*)')
-        .eq('token', token)
-        .single();
+      const response = await fetch(`/api/scan/validate?token=${token}`);
+      const data = await response.json();
 
-      if (error || !qrToken) {
-        setErrorMsg('Invalid QR code. Ask the shopkeeper for a new one.');
+      if (!response.ok) {
+        setErrorMsg(data.error || 'Invalid QR code. Ask the shopkeeper for a new one.');
         setState('error');
         return;
       }
 
-      if (qrToken.used) {
-        setErrorMsg('This QR code has already been used.');
-        setState('error');
-        return;
-      }
-
-      if (new Date(qrToken.expires_at) < new Date()) {
-        setErrorMsg('This QR code has expired. Ask the shop for a new one.');
-        setState('error');
-        return;
-      }
-
+      const qrToken = data.qrToken;
       setMerchant(qrToken.merchant);
       setCampaign(qrToken.campaign);
       setAmount(qrToken.amount);
