@@ -11,6 +11,10 @@ export interface Merchant {
   shop_category: string;
   logo_url: string | null;
   merchant_code: string | null;
+  current_package: string;
+  status: string;
+  last_login_at: string | null;
+  notes: string | null;
   created_at: string;
 }
 
@@ -81,6 +85,25 @@ export interface MessageLog {
   status: 'sent' | 'failed';
 }
 
+export interface MerchantPackage {
+  id: string;
+  merchant_id: string;
+  package_name: 'trial' | 'starter' | 'growth';
+  price: number;
+  started_at: string;
+  ended_at: string | null;
+  is_current: boolean;
+  notes: string | null;
+}
+
+export interface MerchantStatusLog {
+  id: string;
+  merchant_id: string;
+  status: 'active' | 'inactive' | 'churned' | 'trial';
+  changed_at: string;
+  reason: string | null;
+}
+
 // --- API Request / Response Types ---
 
 export interface CreateCampaignRequest {
@@ -148,26 +171,94 @@ export interface AnalyticsData {
   }[];
 }
 
+// --- Admin Types ---
+
 export interface AdminOverview {
-  totalMerchants: number;
-  totalCustomers: number;
-  totalMessages: number;
-  totalCost: number;
-  merchants: {
-    id: string;
-    shop_name: string;
-    email: string;
-    campaigns: number;
-    customers: number;
-    messages: number;
-    cost: number;
-    created_at: string;
-  }[];
+  stats: {
+    total_merchants: number;
+    active_merchants: number;
+    total_customers: number;
+    total_transactions: number;
+    revenue_mtd: number;
+    whatsapp_cost_mtd: number;
+    margin_mtd: number;
+  };
+  merchants: AdminMerchantRow[];
+  churn_risks: ChurnRiskMerchant[];
+  recent_activity: ActivityEvent[];
+  monthly_revenue_chart: { month: string; revenue: number; cost: number; margin: number }[];
   costBreakdown: {
     service: number;
     utility: number;
     marketing: number;
   };
+}
+
+export interface AdminMerchantRow {
+  id: string;
+  shop_name: string;
+  shop_category: string;
+  email: string;
+  current_package: string;
+  status: string;
+  campaigns: number;
+  customers_this_month: number;
+  transactions_this_month: number;
+  whatsapp_cost_this_month: number;
+  revenue_this_month: number;
+  last_login_at: string | null;
+  created_at: string;
+}
+
+export interface ChurnRiskMerchant {
+  id: string;
+  shop_name: string;
+  email: string;
+  reason: string;
+  last_login_at: string | null;
+}
+
+export interface ActivityEvent {
+  id: string;
+  text: string;
+  timestamp: string;
+  type: 'campaign' | 'transaction' | 'customer' | 'merchant';
+}
+
+export interface AdminMerchantDetail {
+  merchant: Merchant;
+  package_history: MerchantPackage[];
+  campaigns: AdminCampaignRow[];
+  sales_chart_daily: { date: string; transactions: number; amount: number }[];
+  sales_chart_monthly: { month: string; transactions: number; amount: number }[];
+  customer_stats: {
+    total: number;
+    new_this_month: number;
+    returning_rate: number;
+    by_status: { active: number; completed: number; expired: number };
+  };
+  whatsapp_costs: {
+    service: { count: number; cost: number };
+    utility: { count: number; cost: number };
+    marketing: { count: number; cost: number };
+    total: number;
+    this_month: number;
+  };
+}
+
+export interface AdminCampaignRow {
+  id: string;
+  name: string;
+  campaign_type: string;
+  target: string;
+  duration_days: number;
+  reward_description: string;
+  enrolled: number;
+  completed: number;
+  completion_rate: number;
+  sales_generated: number;
+  created_at: string;
+  status: string;
 }
 
 // --- Enrollment with joined data ---

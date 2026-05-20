@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
-import { formatCurrency, isValidIndianPhone, calcPercentage, daysRemaining } from '@/lib/utils';
+import { formatCurrency, isValidIndianPhone } from '@/lib/utils';
 import type { Campaign, Merchant } from '@/types';
 
-type PageState = 'loading' | 'invalid' | 'form' | 'confirm' | 'processing' | 'success';
+type PageState = 'loading' | 'error' | 'form' | 'redirecting';
 
 export default function ScanPage() {
   const params = useParams();
@@ -23,73 +23,110 @@ export default function ScanPage() {
   const [birthMonth, setBirthMonth] = useState('');
   const [birthDay, setBirthDay] = useState('');
   const [isReturning, setIsReturning] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
+  // Auto-countdown for returning customers
+  const [countdown, setCountdown] = useState(3);
+  const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  const autoSubmitRef = useRef(false);
 
+  // Validate token on mount
   useEffect(() => {
     validateToken();
-    // Check localStorage for returning customer
-    const saved = localStorage.getItem('loyaltyqr_phone');
-    if (saved) {
-      setWhatsappNumber(saved);
-      setIsReturning(true);
-    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const validateToken = async () => {
-    const supabase = createClient();
-    const { data: qrToken, error } = await supabase
-      .from('qr_tokens')
-      .select('*, merchant:merchants(*), campaign:campaigns(*)')
-      .eq('token', token)
-      .single();
+    try {
+      const supabase = createClient();
+      const { data: qrToken, error } = await supabase
+        .from('qr_tokens')
+        .select('*, merchant:merchants(*), campaign:campaigns(*)')
+        .eq('token', token)
+        .single();
 
-    if (error || !qrToken) {
-      setErrorMsg('Invalid QR code.');
-      setState('invalid');
-      return;
-    }
+      if (error || !qrToken) {
+        setErrorMsg('Invalid QR code. Ask the shopkeeper for a new one.');
+        setState('error');
+        return;
+      }
 
-    if (qrToken.used) {
-      setErrorMsg('This QR code has already been used.');
-      setState('invalid');
-      return;
-    }
+      if (qrToken.used) {
+        setErrorMsg('This QR code has already been used.');
+        setState('error');
+        return;
+      }
 
-    if (new Date(qrToken.expires_at) < new Date()) {
-      setErrorMsg('This QR code has expired. Ask the shop for a new one.');
-      setState('invalid');
-      return;
-    }
+      if (new Date(qrToken.expires_at) < new Date()) {
+        setErrorMsg('This QR code has expired. Ask the shop for a new one.');
+        setState('error');
+        return;
+      }
 
-    setMerchant(qrToken.merchant);
-    setCampaign(qrToken.campaign);
-    setAmount(qrToken.amount);
+      setMerchant(qrToken.merchant);
+      setCampaign(qrToken.campaign);
+      setAmount(qrToken.amount);
 
-    // If returning customer, skip to confirm
-    const saved = localStorage.getItem('loyaltyqr_phone');
-    if (saved) {
-      setState('confirm');
-    } else {
+      // Check localStorage for returning customer (per-merchant key)
+      const merchantId = qrToken.merchant?.id;
+      if (merchantId) {
+        const saved = localStorage.getItem(`wnum_${merchantId}`);
+        if (saved && isValidIndianPhone(saved)) {
+          setWhatsappNumber(saved);
+          setIsReturning(true);
+        }
+      }
+
       setState('form');
+    } catch {
+      setErrorMsg('Something went wrong. Please try again.');
+      setState('error');
     }
   };
 
-  const handleSubmitForm = (e: React.FormEvent) => {
-    e.preventDefault();
+  // Start auto-countdown for returning customers
+  useEffect(() => {
+    if (state === 'form' && isReturning && !autoSubmitRef.current) {
+      setCountdown(3);
+      countdownRef.current = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            if (countdownRef.current) clearInterval(countdownRef.current);
+            autoSubmitRef.current = true;
+            handleSubmit();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, isReturning]);
+
+  const cancelAutoSubmit = () => {
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+    setCountdown(0);
+  };
+
+  const handleSubmit = useCallback(async () => {
+    if (submitting) return;
+
     if (!isValidIndianPhone(whatsappNumber)) {
       setErrorMsg('Please enter a valid 10-digit Indian phone number');
       return;
     }
     setErrorMsg('');
-    // Save to localStorage
-    localStorage.setItem('loyaltyqr_phone', whatsappNumber);
-    setState('confirm');
-  };
+    setSubmitting(true);
 
-  const handleConfirm = async () => {
-    setState('processing');
     try {
-      const response = await fetch('/api/scan', {
+      const response = await fetch('/api/scan/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -103,30 +140,39 @@ export default function ScanPage() {
       const data = await response.json();
 
       if (data.success) {
-        setState('success');
+        // Save to localStorage (per-merchant)
+        localStorage.setItem(`wnum_${data.merchant_id}`, whatsappNumber);
+
+        // Switch to redirecting state
+        setState('redirecting');
+
+        // Redirect to WhatsApp after a brief delay
+        const businessNumber = process.env.NEXT_PUBLIC_WHATSAPP_BUSINESS_NUMBER || '';
+        const waUrl = `https://wa.me/${businessNumber}?text=TXN-${token}`;
+        setTimeout(() => {
+          window.location.href = waUrl;
+        }, 800);
       } else {
-        setErrorMsg(data.message || 'Something went wrong');
-        setState('invalid');
+        setErrorMsg(data.error || 'Something went wrong');
+        setSubmitting(false);
       }
     } catch {
       setErrorMsg('Network error. Please try again.');
-      setState('invalid');
+      setSubmitting(false);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [whatsappNumber, birthMonth, birthDay, token, submitting]);
 
-  // Open WhatsApp with pre-filled message
-  const openWhatsApp = () => {
-    const businessNumber = process.env.NEXT_PUBLIC_WHATSAPP_BUSINESS_NUMBER || '';
-    const waUrl = `https://wa.me/${businessNumber}?text=TXN-${token}`;
-    window.open(waUrl, '_blank');
-    
-    // Process API to save profile, then show success state
-    handleConfirm();
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    cancelAutoSubmit();
+    handleSubmit();
   };
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', padding: '1rem' }}>
       <div className="container-sm" style={{ paddingTop: '1rem' }}>
+
         {/* LOADING */}
         {state === 'loading' && (
           <div style={{ textAlign: 'center', paddingTop: '4rem' }}>
@@ -135,103 +181,170 @@ export default function ScanPage() {
           </div>
         )}
 
-        {/* INVALID */}
-        {state === 'invalid' && (
+        {/* ERROR */}
+        {state === 'error' && (
           <div className="card slide-up" style={{ textAlign: 'center', padding: '3rem 2rem' }}>
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>❌</div>
-            <h1 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>
+            <h1 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.75rem' }}>
               QR Code Error
             </h1>
-            <p style={{ color: 'var(--text-secondary)' }}>{errorMsg}</p>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>{errorMsg}</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+              Ask the shopkeeper to generate a new QR code
+            </p>
           </div>
         )}
 
-        {/* FORM — First time customer */}
+        {/* FORM — Registration / Returning */}
         {state === 'form' && merchant && campaign && (
           <div className="slide-up">
             {/* Shop info */}
             <div className="card" style={{ textAlign: 'center', marginBottom: '1rem' }}>
               <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🏪</div>
-              <h1 style={{ fontSize: '1.25rem', fontWeight: 800 }}>{merchant.shop_name}</h1>
+              <h1 style={{ fontSize: '1.5rem', fontWeight: 800 }}>{merchant.shop_name}</h1>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
                 {merchant.shop_category}
               </p>
             </div>
 
-            {/* Campaign + amount */}
+            {/* Campaign info */}
             <div className="card" style={{ marginBottom: '1rem', borderColor: 'rgba(16, 185, 129, 0.3)' }}>
               <div style={{ textAlign: 'center' }}>
                 <div className="badge badge-success" style={{ marginBottom: '0.75rem' }}>
-                  {campaign.campaign_type === 'amount' ? '💰 Amount Campaign' : '🏃 Visit Campaign'}
+                  🎯 {campaign.name || (campaign.campaign_type === 'amount' ? 'Spend & Win' : 'Visit & Win')}
                 </div>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.25rem' }}>
-                  {campaign.campaign_type === 'amount'
-                    ? formatCurrency(amount)
-                    : 'Visit Logged'}
-                </h2>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
                   Goal: {campaign.campaign_type === 'amount'
-                    ? `Spend ${formatCurrency(campaign.target_amount || 0)}`
-                    : `${campaign.target_visits} visits`}
-                  {' '}in {campaign.duration_days} days
+                    ? `Spend ${formatCurrency(campaign.target_amount || 0)} in ${campaign.duration_days} days`
+                    : `${campaign.target_visits} visits in ${campaign.duration_days} days`}
                 </p>
-                <p style={{ color: 'var(--primary)', fontWeight: 600, marginTop: '0.5rem' }}>
+                <p style={{ color: 'var(--primary)', fontWeight: 600 }}>
                   🎁 {campaign.reward_description}
                 </p>
               </div>
             </div>
 
-            {/* Customer form */}
-            <form onSubmit={handleSubmitForm}>
-              <div className="card" style={{ marginBottom: '1rem' }}>
-                <label className="label">WhatsApp Number *</label>
-                <input
-                  type="tel"
-                  className="input"
-                  placeholder="9876543210"
-                  value={whatsappNumber}
-                  onChange={(e) => setWhatsappNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  required
-                  autoFocus
-                  maxLength={10}
-                  id="whatsapp-input"
-                />
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
-                  You&apos;ll receive progress updates on this number
-                </p>
-              </div>
+            {/* Transaction amount banner */}
+            <div
+              className="card"
+              style={{
+                marginBottom: '1.5rem',
+                textAlign: 'center',
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05))',
+                borderColor: 'rgba(16, 185, 129, 0.4)',
+              }}
+            >
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+                {campaign.campaign_type === 'amount' ? 'Amount being added' : 'Visit being logged'}
+              </p>
+              <p style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--primary)' }}>
+                {campaign.campaign_type === 'amount' ? formatCurrency(amount) : '✓ 1 Visit'}
+              </p>
+            </div>
 
-              <div className="card" style={{ marginBottom: '1.5rem' }}>
-                <label className="label">Birthday (optional — for birthday rewards!)</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                  <select
-                    className="select"
-                    value={birthMonth}
-                    onChange={(e) => setBirthMonth(e.target.value)}
-                  >
-                    <option value="">Month</option>
-                    {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map(
-                      (m, i) => (
-                        <option key={m} value={i + 1}>
-                          {m}
-                        </option>
-                      )
-                    )}
-                  </select>
-                  <select
-                    className="select"
-                    value={birthDay}
-                    onChange={(e) => setBirthDay(e.target.value)}
-                  >
-                    <option value="">Day</option>
-                    {Array.from({ length: 31 }, (_, i) => (
-                      <option key={i + 1} value={i + 1}>
-                        {i + 1}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            {/* Returning customer banner */}
+            {isReturning && (
+              <div
+                className="card"
+                style={{
+                  marginBottom: '1rem',
+                  textAlign: 'center',
+                  borderColor: 'rgba(59, 130, 246, 0.3)',
+                }}
+              >
+                <p style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.25rem' }}>
+                  Welcome back! 👋
+                </p>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                  WhatsApp: <strong>{whatsappNumber}</strong>
+                </p>
+                {countdown > 0 && (
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <p style={{ color: 'var(--accent)', fontSize: '0.85rem', fontWeight: 600 }}>
+                      Confirming in {countdown}...
+                    </p>
+                    <button
+                      onClick={() => {
+                        cancelAutoSubmit();
+                        setIsReturning(false);
+                        setWhatsappNumber('');
+                        localStorage.removeItem(`wnum_${merchant.id}`);
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-muted)',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        marginTop: '0.5rem',
+                        textDecoration: 'underline',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      Not you? Use a different number
+                    </button>
+                  </div>
+                )}
               </div>
+            )}
+
+            {/* Customer form */}
+            <form onSubmit={handleFormSubmit}>
+              {/* WhatsApp input (always shown but pre-filled for returning) */}
+              {!isReturning && (
+                <div className="card" style={{ marginBottom: '1rem' }}>
+                  <label className="label">WhatsApp Number *</label>
+                  <input
+                    type="tel"
+                    className="input"
+                    placeholder="9876543210"
+                    value={whatsappNumber}
+                    onChange={(e) => setWhatsappNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    required
+                    autoFocus
+                    maxLength={10}
+                    id="whatsapp-input"
+                  />
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
+                    You&apos;ll receive progress updates on this number
+                  </p>
+                </div>
+              )}
+
+              {/* Birthday fields (hidden for returning customers) */}
+              {!isReturning && (
+                <div className="card" style={{ marginBottom: '1.5rem' }}>
+                  <label className="label">Birthday (optional — for birthday rewards!)</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <select
+                      className="select"
+                      value={birthMonth}
+                      onChange={(e) => setBirthMonth(e.target.value)}
+                    >
+                      <option value="">Month</option>
+                      {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map(
+                        (m, i) => (
+                          <option key={m} value={i + 1}>
+                            {m}
+                          </option>
+                        )
+                      )}
+                    </select>
+                    <select
+                      className="select"
+                      value={birthDay}
+                      onChange={(e) => setBirthDay(e.target.value)}
+                    >
+                      <option value="">Day</option>
+                      {Array.from({ length: 31 }, (_, i) => (
+                        <option key={i + 1} value={i + 1}>
+                          {i + 1}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
 
               {errorMsg && (
                 <div className="alert alert-error" style={{ marginBottom: '1rem' }}>
@@ -243,81 +356,24 @@ export default function ScanPage() {
                 type="submit"
                 className="btn btn-whatsapp btn-full btn-lg"
                 id="confirm-whatsapp-btn"
+                disabled={submitting}
               >
-                💬 Continue with WhatsApp
+                {submitting ? (
+                  <>
+                    <div className="spinner" style={{ width: 20, height: 20 }} />
+                    Processing...
+                  </>
+                ) : (
+                  '💬 Confirm on WhatsApp →'
+                )}
               </button>
             </form>
           </div>
         )}
 
-        {/* CONFIRM — Returning customer */}
-        {state === 'confirm' && merchant && campaign && (
-          <div className="slide-up" style={{ textAlign: 'center' }}>
-            <div className="card" style={{ marginBottom: '1rem' }}>
-              <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🏪</div>
-              <h1 style={{ fontSize: '1.25rem', fontWeight: 800 }}>{merchant.shop_name}</h1>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
-                {campaign.campaign_type === 'amount'
-                  ? `${formatCurrency(amount)} being added`
-                  : 'Visit being logged'}
-              </p>
-            </div>
-
-            <div className="card" style={{ marginBottom: '1.5rem' }}>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                Your number
-              </p>
-              <p style={{ fontSize: '1.25rem', fontWeight: 700 }}>
-                {whatsappNumber}
-              </p>
-              {isReturning && (
-                <button
-                  onClick={() => {
-                    localStorage.removeItem('loyaltyqr_phone');
-                    setWhatsappNumber('');
-                    setIsReturning(false);
-                    setState('form');
-                  }}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--accent)',
-                    cursor: 'pointer',
-                    fontSize: '0.85rem',
-                    marginTop: '0.5rem',
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  Use a different number
-                </button>
-              )}
-            </div>
-
-            <button
-              onClick={openWhatsApp}
-              className="btn btn-whatsapp btn-full btn-lg"
-              id="send-whatsapp-btn"
-            >
-              💬 Confirm via WhatsApp
-            </button>
-
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '1rem' }}>
-              Tapping this will open WhatsApp with a pre-filled message
-            </p>
-          </div>
-        )}
-
-        {/* PROCESSING */}
-        {state === 'processing' && (
-          <div style={{ textAlign: 'center', paddingTop: '4rem' }}>
-            <div className="spinner" style={{ width: 40, height: 40, margin: '0 auto' }} />
-            <p style={{ color: 'var(--text-secondary)', marginTop: '1rem' }}>Processing transaction...</p>
-          </div>
-        )}
-
-        {/* SUCCESS */}
-        {state === 'success' && (
-          <div className="slide-up" style={{ textAlign: 'center' }}>
+        {/* REDIRECTING */}
+        {state === 'redirecting' && (
+          <div className="slide-up" style={{ textAlign: 'center', paddingTop: '3rem' }}>
             <div
               style={{
                 width: '80px',
@@ -332,22 +388,32 @@ export default function ScanPage() {
                 border: '2px solid var(--primary)',
               }}
             >
-              💬
+              ✅
             </div>
 
             <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.5rem' }}>
-              Check your WhatsApp!
+              Almost done!
             </h2>
-            
             <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
-              We have sent your progress update directly to your phone.
+              Opening WhatsApp... Just tap Send to confirm your transaction.
             </p>
 
-            <div className="alert alert-success" style={{ justifyContent: 'center' }}>
-              ✅ You can now close this page
-            </div>
+            <div className="spinner" style={{ width: 30, height: 30, margin: '0 auto 1.5rem' }} />
+
+            <a
+              href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_BUSINESS_NUMBER || ''}?text=TXN-${token}`}
+              className="btn btn-whatsapp btn-full btn-lg"
+              style={{ textDecoration: 'none', marginBottom: '1rem' }}
+            >
+              💬 Tap here if WhatsApp didn&apos;t open
+            </a>
+
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+              After sending the message, you&apos;ll receive your progress update on WhatsApp
+            </p>
           </div>
         )}
+
       </div>
     </div>
   );
