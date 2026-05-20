@@ -143,7 +143,8 @@ export default function ScanPage() {
         setState('redirecting');
 
         // Redirect to WhatsApp after a brief delay
-        const businessNumber = process.env.NEXT_PUBLIC_WHATSAPP_BUSINESS_NUMBER || '';
+        const rawNumber = process.env.NEXT_PUBLIC_WHATSAPP_BUSINESS_NUMBER || '';
+        const businessNumber = rawNumber.replace(/\D/g, ''); // Strip +, spaces, parentheses
         const waUrl = `https://wa.me/${businessNumber}?text=TXN-${token}`;
         setTimeout(() => {
           window.location.href = waUrl;
@@ -401,7 +402,7 @@ export default function ScanPage() {
             <div className="spinner" style={{ width: 30, height: 30, margin: '0 auto 1.5rem' }} />
 
             <a
-              href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_BUSINESS_NUMBER || ''}?text=TXN-${token}`}
+              href={`https://wa.me/${(process.env.NEXT_PUBLIC_WHATSAPP_BUSINESS_NUMBER || '').replace(/\D/g, '')}?text=TXN-${token}`}
               className="btn btn-whatsapp btn-full btn-lg"
               style={{ textDecoration: 'none', marginBottom: '1rem' }}
             >
