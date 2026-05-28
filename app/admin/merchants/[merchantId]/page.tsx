@@ -24,11 +24,6 @@ export default function MerchantDetailPage() {
   const [editNotes, setEditNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [merchantId]);
-
   const loadData = async () => {
     try {
       const supabase = createClient();
@@ -54,6 +49,14 @@ export default function MerchantDetailPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadData();
+    }, 0);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [merchantId]);
 
   const handleSave = async () => {
     setSaving(true);

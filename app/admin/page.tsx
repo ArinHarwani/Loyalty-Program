@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase';
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils';
 import Link from 'next/link';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, Bar,
 } from 'recharts';
 import type { AdminOverview, AdminMerchantRow } from '@/types';
@@ -18,10 +18,6 @@ export default function AdminPage() {
   const [error, setError] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('created_at');
   const [sortAsc, setSortAsc] = useState(false);
-
-  useEffect(() => {
-    loadAdmin();
-  }, []);
 
   const loadAdmin = async () => {
     try {
@@ -44,6 +40,13 @@ export default function AdminPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadAdmin();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {

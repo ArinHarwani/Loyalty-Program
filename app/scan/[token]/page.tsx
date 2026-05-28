@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { createClient } from '@/lib/supabase';
+import Link from 'next/link';
 import { formatCurrency, isValidIndianPhone } from '@/lib/utils';
 import type { Campaign, Merchant } from '@/types';
 
@@ -29,14 +29,6 @@ export default function ScanPage() {
   const [countdown, setCountdown] = useState(3);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const autoSubmitRef = useRef(false);
-
-  // Validate token on mount
-  useEffect(() => {
-    if (token) {
-      validateToken();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
 
   const validateToken = async () => {
     try {
@@ -76,28 +68,16 @@ export default function ScanPage() {
     }
   };
 
-  // Start auto-countdown for returning customers
+  // Validate token on mount
   useEffect(() => {
-    if (state === 'form' && isReturning && !autoSubmitRef.current) {
-      setCountdown(3);
-      countdownRef.current = setInterval(() => {
-        setCountdown(prev => {
-          if (prev <= 1) {
-            if (countdownRef.current) clearInterval(countdownRef.current);
-            autoSubmitRef.current = true;
-            handleSubmit();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+    if (token) {
+      const timer = setTimeout(() => {
+        validateToken();
+      }, 0);
+      return () => clearTimeout(timer);
     }
-
-    return () => {
-      if (countdownRef.current) clearInterval(countdownRef.current);
-    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, isReturning]);
+  }, [token]);
 
   const cancelAutoSubmit = () => {
     if (countdownRef.current) {
@@ -157,8 +137,30 @@ export default function ScanPage() {
       setErrorMsg('Network error. Please try again.');
       setSubmitting(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [whatsappNumber, birthMonth, birthDay, token, submitting]);
+
+  // Start auto-countdown for returning customers
+  useEffect(() => {
+    if (state === 'form' && isReturning && !autoSubmitRef.current) {
+      setCountdown(3);
+      countdownRef.current = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            if (countdownRef.current) clearInterval(countdownRef.current);
+            autoSubmitRef.current = true;
+            handleSubmit();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, isReturning]);
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -346,6 +348,17 @@ export default function ScanPage() {
                   </div>
                 </div>
               )}
+
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', textAlign: 'center', marginBottom: '1.25rem', lineHeight: '1.4' }}>
+                By continuing, you consent to receive WhatsApp loyalty updates from this shop and agree to our{' '}
+                <Link href="/terms" target="_blank" style={{ color: 'var(--primary-light)', textDecoration: 'underline' }}>
+                  Terms of Use
+                </Link>{' '}
+                and{' '}
+                <Link href="/privacy" target="_blank" style={{ color: 'var(--primary-light)', textDecoration: 'underline' }}>
+                  Privacy Policy
+                </Link>.
+              </p>
 
               {errorMsg && (
                 <div className="alert alert-error" style={{ marginBottom: '1rem' }}>

@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { CampaignSchema } from '@/lib/validation';
 
 async function getAuthUser() {
   const cookieStore = await cookies();
@@ -44,28 +45,24 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, campaign_type, target_amount, target_visits, duration_days, reward_description, max_winners } = body;
+    const validationResult = CampaignSchema.safeParse(body);
 
-    // Validation
-    if (!name || !campaign_type || !duration_days || !reward_description) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: validationResult.error.errors[0]?.message || 'Invalid campaign data' },
+        { status: 400 }
+      );
     }
 
-    if (!['amount', 'visits'].includes(campaign_type)) {
-      return NextResponse.json({ error: 'Invalid campaign type' }, { status: 400 });
-    }
-
-    if (![15, 30, 45, 60].includes(duration_days)) {
-      return NextResponse.json({ error: 'Invalid duration' }, { status: 400 });
-    }
-
-    if (campaign_type === 'amount' && (!target_amount || target_amount < 100)) {
-      return NextResponse.json({ error: 'Target amount must be at least ₹100' }, { status: 400 });
-    }
-
-    if (campaign_type === 'visits' && (!target_visits || target_visits < 2)) {
-      return NextResponse.json({ error: 'Target visits must be at least 2' }, { status: 400 });
-    }
+    const {
+      name,
+      campaign_type,
+      target_amount,
+      target_visits,
+      duration_days,
+      reward_description,
+      max_winners,
+    } = validationResult.data;
 
     const { data: campaign, error: insertError } = await supabase
       .from('campaigns')
@@ -83,7 +80,8 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
+      console.error('Campaign creation failed in database:', insertError);
+      return NextResponse.json({ error: 'Failed to create campaign' }, { status: 500 });
     }
 
     return NextResponse.json(campaign);

@@ -13,10 +13,6 @@ export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadAnalytics();
-  }, []);
-
   const loadAnalytics = async () => {
     try {
       const supabase = createClient();
@@ -39,6 +35,13 @@ export default function AnalyticsPage() {
     }
   };
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadAnalytics();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
+
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -60,7 +63,6 @@ export default function AnalyticsPage() {
     );
   }
 
-  const segmentColors = data.segments.map((s) => s.color);
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>

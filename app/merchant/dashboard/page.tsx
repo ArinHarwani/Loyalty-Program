@@ -16,10 +16,6 @@ export default function DashboardPage() {
   const [winners, setWinners] = useState<(Enrollment & { customer?: Customer })[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
   const loadData = async () => {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -83,6 +79,14 @@ export default function DashboardPage() {
 
     setLoading(false);
   };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadData();
+    }, 0);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleClaim = async (enrollmentId: string) => {
     const supabase = createClient();

@@ -102,6 +102,17 @@ export default function MerchantLoginPage() {
                 'Sign In'
               )}
             </button>
+
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', textAlign: 'center', marginTop: '1.25rem', lineHeight: '1.4' }}>
+              By signing in, you agree to our{' '}
+              <Link href="/terms" target="_blank" style={{ color: 'var(--primary-light)', textDecoration: 'underline' }}>
+                Terms of Use
+              </Link>{' '}
+              and{' '}
+              <Link href="/privacy" target="_blank" style={{ color: 'var(--primary-light)', textDecoration: 'underline' }}>
+                Privacy Policy
+              </Link>.
+            </p>
           </form>
 
           <p
@@ -119,6 +130,28 @@ export default function MerchantLoginPage() {
           </p>
         </div>
       </div>
+
+      {/* Footer */}
+      <footer
+        style={{
+          padding: '2rem 1rem',
+          textAlign: 'center',
+          color: 'var(--text-muted)',
+          fontSize: '0.85rem',
+          marginTop: '4rem',
+          borderTop: '1px solid var(--border)',
+        }}
+      >
+        <span className="nav-brand" style={{ fontSize: '1rem', marginBottom: '0.5rem', display: 'block' }}>
+          LoyaltyQR
+        </span>
+        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginBottom: '0.5rem' }}>
+          <Link href="/terms" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Terms of Use</Link>
+          <span style={{ color: 'var(--border)' }}>|</span>
+          <Link href="/privacy" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Privacy Policy</Link>
+        </div>
+        © 2026 LoyaltyQR. Built for Indian businesses with ❤️
+      </footer>
     </div>
   );
 }

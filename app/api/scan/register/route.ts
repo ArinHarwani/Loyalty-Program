@@ -5,20 +5,21 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase';
-import { isValidIndianPhone } from '@/lib/utils';
+import { ScanRegisterSchema } from '@/lib/validation';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { token, whatsapp_number, birth_month, birth_day } = body;
-
-    // 1. Validate WhatsApp number
-    if (!whatsapp_number || !isValidIndianPhone(whatsapp_number)) {
+    const validationResult = ScanRegisterSchema.safeParse(body);
+    
+    if (!validationResult.success) {
       return NextResponse.json(
-        { error: 'Invalid WhatsApp number' },
+        { error: validationResult.error.errors[0]?.message || 'Invalid input' },
         { status: 400 }
       );
     }
+
+    const { token, whatsapp_number, birth_month, birth_day } = validationResult.data;
 
     const supabase = createServiceClient();
 

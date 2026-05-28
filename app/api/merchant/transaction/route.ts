@@ -7,6 +7,7 @@ import { createServiceClient } from '@/lib/supabase';
 import { generateQrToken } from '@/lib/utils';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { TransactionSchema } from '@/lib/validation';
 
 async function getAuthUser() {
   const cookieStore = await cookies();
@@ -47,11 +48,16 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { amount, campaign_id } = body;
+    const validationResult = TransactionSchema.safeParse(body);
 
-    if (!campaign_id) {
-      return NextResponse.json({ error: 'Campaign ID required' }, { status: 400 });
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: validationResult.error.errors[0]?.message || 'Invalid transaction data' },
+        { status: 400 }
+      );
     }
+
+    const { amount, campaign_id } = validationResult.data;
 
     // Verify campaign belongs to merchant
     const { data: campaign } = await supabase
@@ -78,7 +84,8 @@ export async function POST(request: NextRequest) {
     });
 
     if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
+      console.error('Transaction creation query failed:', insertError);
+      return NextResponse.json({ error: 'Failed to record transaction' }, { status: 500 });
     }
 
     return NextResponse.json({ token, expires_at: expiresAt });

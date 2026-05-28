@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
 
     // Send to all unique customers
     let sent = 0;
-    let failed = 0;
+    const failed = 0;
 
     for (const [, customer] of uniqueCustomers) {
       await sendWhatsAppMessage(

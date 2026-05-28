@@ -7,7 +7,8 @@ export default function LandingPage() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    const handle = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(handle);
   }, []);
 
   return (
@@ -358,7 +359,12 @@ export default function LandingPage() {
         <span className="nav-brand" style={{ fontSize: '1rem', marginBottom: '0.5rem', display: 'block' }}>
           LoyaltyQR
         </span>
-        © {new Date().getFullYear()} LoyaltyQR. Built for Indian businesses with ❤️
+        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginBottom: '0.5rem' }}>
+          <Link href="/terms" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Terms of Use</Link>
+          <span style={{ color: 'var(--border)' }}>|</span>
+          <Link href="/privacy" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Privacy Policy</Link>
+        </div>
+        © 2026 LoyaltyQR. Built for Indian businesses with ❤️
       </footer>
     </div>
   );

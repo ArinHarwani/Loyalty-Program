@@ -68,7 +68,6 @@ export async function GET() {
 
     // Per-merchant stats
     const merchantStats = allMerchants.map((m) => {
-      const mLogs = allLogs.filter((l) => l.merchant_id === m.id);
       const mCampaigns = allCampaigns.filter((c) => c.merchant_id === m.id);
       const mTransMTD = mtdTransactions.filter(t => t.merchant_id === m.id);
       const mLogsMTD = mtdLogs.filter(l => l.merchant_id === m.id);
