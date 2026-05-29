@@ -18,10 +18,6 @@ export default function ProgressPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    loadProgress();
-  }, []);
-
   const loadProgress = async () => {
     const supabase = createClient();
 
@@ -74,6 +70,14 @@ export default function ProgressPage() {
     setTransactions(txnData || []);
     setLoading(false);
   };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadProgress();
+    }, 0);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loading) {
     return (

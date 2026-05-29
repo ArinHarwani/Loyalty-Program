@@ -19,7 +19,6 @@ export default function TransactionPage() {
   const [mode, setMode] = useState<TxnMode>('purchase');
   const [state, setState] = useState<PageState>('input');
   const [qrDataUrl, setQrDataUrl] = useState('');
-  const [token, setToken] = useState('');
   const [countdown, setCountdown] = useState(60);
   const [loading, setLoading] = useState(false);
   const [scannedCustomer, setScannedCustomer] = useState('');
@@ -101,7 +100,6 @@ export default function TransactionPage() {
         },
       });
 
-      setToken(newToken);
       setQrDataUrl(dataUrl);
       setCountdown(60);
       setState('qr');
@@ -155,7 +153,6 @@ export default function TransactionPage() {
     setAmount('');
     setState('input');
     setQrDataUrl('');
-    setToken('');
     setCountdown(60);
     setScannedCustomer('');
     setMode('purchase');
@@ -381,6 +378,7 @@ export default function TransactionPage() {
               }}
             >
               {qrDataUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={qrDataUrl}
                   alt="Scan QR Code"

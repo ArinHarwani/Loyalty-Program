@@ -25,10 +25,6 @@ export default function AdminPage() {
   const [sortKey, setSortKey] = useState<SortKey>('created_at');
   const [sortAsc, setSortAsc] = useState(false);
 
-  useEffect(() => {
-    loadAdmin();
-  }, []);
-
   const loadAdmin = async () => {
     try {
       const supabase = createClient();
@@ -50,6 +46,13 @@ export default function AdminPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadAdmin();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {

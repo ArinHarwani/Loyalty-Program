@@ -32,11 +32,6 @@ export default function MerchantDetailPage() {
   const [startDate, setStartDate] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [merchantId]);
-
   const loadData = async () => {
     try {
       const supabase = createClient();

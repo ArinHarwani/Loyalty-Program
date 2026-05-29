@@ -1,7 +1,40 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { checkRateLimit } from './lib/rateLimit';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+
+  // Enforce server-side rate limits on API endpoints
+  if (path.startsWith('/api/')) {
+    // Exclude webhook (Meta verified signature) and cron triggers (secret verified token)
+    if (
+      !path.startsWith('/api/whatsapp/webhook') &&
+      !path.startsWith('/api/cron/')
+    ) {
+      const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || (request as NextRequest & { ip?: string }).ip || '127.0.0.1';
+      const rateLimitKey = `rl:${ip}:${path}`;
+      
+      // Limit to 60 requests per minute per IP per API route
+      const limitResult = await checkRateLimit(rateLimitKey, 60, 60);
+      
+      if (!limitResult.success) {
+        return new NextResponse(
+          JSON.stringify({ error: 'Too many requests. Please try again later.' }),
+          {
+            status: 429,
+            headers: {
+              'Content-Type': 'application/json',
+              'Retry-After': '60',
+              'X-RateLimit-Limit': String(limitResult.limit),
+              'X-RateLimit-Remaining': String(limitResult.remaining),
+            },
+          }
+        );
+      }
+    }
+  }
+
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -17,7 +50,7 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
+          cookiesToSet.forEach(({ name, value }) => {
             request.cookies.set(name, value);
           });
           response = NextResponse.next({
