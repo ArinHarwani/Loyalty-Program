@@ -363,6 +363,8 @@ export default function LandingPage() {
           <Link href="/terms" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Terms of Use</Link>
           <span style={{ color: 'var(--border)' }}>|</span>
           <Link href="/privacy" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Privacy Policy</Link>
+          <span style={{ color: 'var(--border)' }}>|</span>
+          <Link href="/contact" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Contact Us</Link>
         </div>
         © 2026 LoyaltyQR. Built for Indian businesses with ❤️
       </footer>
