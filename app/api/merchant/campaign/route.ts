@@ -35,12 +35,19 @@ export async function POST(request: NextRequest) {
     const supabase = createServiceClient();
     const { data: merchant } = await supabase
       .from('merchants')
-      .select('id')
+      .select('id, subscription_status')
       .eq('email', user.email)
       .single();
 
     if (!merchant) {
       return NextResponse.json({ error: 'Merchant not found' }, { status: 404 });
+    }
+
+    if (merchant.subscription_status === 'inactive' || merchant.subscription_status === 'blocked') {
+      return NextResponse.json(
+        { error: 'Account not active. Please contact support.' },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();

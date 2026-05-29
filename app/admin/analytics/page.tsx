@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatDate } from '@/lib/utils';
 import Link from 'next/link';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -28,6 +28,13 @@ interface AnalyticsData {
     category_breakdown: { service: number; utility: number; marketing: number };
     total_messages: number;
     total_cost: number;
+  };
+  revenue: {
+    total: number;
+    mrr: number;
+    avg_per_merchant: number;
+    by_plan: Record<string, number>;
+    upcoming_renewals: { shop_name: string; end_date: string | null; plan: string | null }[];
   };
 }
 
@@ -118,6 +125,67 @@ export default function AdminAnalyticsPage() {
             </div>
           ))}
         </div>
+
+        {/* Business Metrics */}
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1rem', marginTop: '2rem' }}>Business Metrics</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div className="card">
+            <h3 style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>MRR</h3>
+            <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--primary)' }}>{formatCurrency(data.revenue.mrr)}</div>
+          </div>
+          <div className="card">
+            <h3 style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Avg Rev / Merchant</h3>
+            <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--success)' }}>{formatCurrency(data.revenue.avg_per_merchant)}</div>
+          </div>
+          <div className="card">
+            <h3 style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Total Collections All-Time</h3>
+            <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--accent)' }}>{formatCurrency(data.revenue.total)}</div>
+          </div>
+        </div>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+          {/* Revenue By Plan */}
+          <div className="card">
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>📦 Revenue By Plan</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {Object.entries(data.revenue.by_plan).map(([plan, rev]) => (
+                <div key={plan} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ textTransform: 'capitalize', fontWeight: 600 }}>{plan}</span>
+                  <span style={{ color: 'var(--success)' }}>{formatCurrency(rev as number)}</span>
+                </div>
+              ))}
+              {Object.keys(data.revenue.by_plan).length === 0 && (
+                <p style={{ color: 'var(--text-muted)' }}>No revenue data yet</p>
+              )}
+            </div>
+          </div>
+
+          {/* Upcoming Renewals */}
+          <div className="card">
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>📅 Upcoming Renewals (30 Days)</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {data.revenue.upcoming_renewals.slice(0, 5).map(m => (
+                <div key={m.shop_name} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--border)' }}>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{m.shop_name}</div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>{m.plan}</div>
+                  </div>
+                  <span style={{ color: 'var(--warning)', fontWeight: 600 }}>{m.end_date ? formatDate(m.end_date) : '-'}</span>
+                </div>
+              ))}
+              {data.revenue.upcoming_renewals.length === 0 && (
+                <p style={{ color: 'var(--text-muted)' }}>No renewals in next 30 days</p>
+              )}
+              {data.revenue.upcoming_renewals.length > 5 && (
+                <div style={{ textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+                  +{data.revenue.upcoming_renewals.length - 5} more
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1rem', marginTop: '2rem' }}>Platform Growth</h2>
 
         {/* Acquisition Charts */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>

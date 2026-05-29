@@ -45,12 +45,19 @@ export async function GET(
       return NextResponse.json({ error: 'Merchant not found' }, { status: 404 });
     }
 
-    // Package history
+    // Package history (legacy)
     const { data: packageHistory } = await service
       .from('merchant_packages')
       .select('*')
       .eq('merchant_id', merchantId)
       .order('started_at', { ascending: false });
+
+    // Subscription history (new)
+    const { data: subscriptionHistory } = await service
+      .from('subscriptions')
+      .select('*')
+      .eq('merchant_id', merchantId)
+      .order('start_date', { ascending: false });
 
     // All campaigns
     const { data: campaigns } = await service
@@ -169,6 +176,7 @@ export async function GET(
     return NextResponse.json({
       merchant,
       package_history: packageHistory || [],
+      subscription_history: subscriptionHistory || [],
       campaigns: campaignStats,
       sales_chart_daily: dailyChart,
       sales_chart_monthly: monthlyChart,

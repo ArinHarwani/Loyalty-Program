@@ -9,12 +9,14 @@ import QRCode from 'qrcode';
 import type { Merchant, Campaign } from '@/types';
 
 type PageState = 'input' | 'qr' | 'success' | 'expired';
+type TxnMode = 'purchase' | 'return';
 
 export default function TransactionPage() {
   const router = useRouter();
   const [merchant, setMerchant] = useState<Merchant | null>(null);
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [amount, setAmount] = useState('');
+  const [mode, setMode] = useState<TxnMode>('purchase');
   const [state, setState] = useState<PageState>('input');
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [token, setToken] = useState('');
@@ -36,7 +38,6 @@ export default function TransactionPage() {
           .then(({ data }) => {
             if (data) {
               setMerchant(data);
-              // Get active campaign
               supabase
                 .from('campaigns')
                 .select('*')
@@ -59,8 +60,11 @@ export default function TransactionPage() {
     };
   }, [router]);
 
+  const isReturn = mode === 'return';
+
   const generateQR = async () => {
-    if (!amount || !campaign || !merchant) return;
+    if (!campaign || !merchant) return;
+    if (campaign.campaign_type === 'amount' && !amount) return;
 
     setLoading(true);
     try {
@@ -68,12 +72,16 @@ export default function TransactionPage() {
       const newToken = generateQrToken();
       const expiresAt = new Date(Date.now() + 60 * 1000).toISOString();
 
-      // Insert QR token
+      // Store negative amount for returns
+      const storedAmount = isReturn
+        ? -Math.abs(Number(amount))
+        : (campaign.campaign_type === 'visits' ? 0 : Number(amount));
+
       const { error } = await supabase.from('qr_tokens').insert({
         token: newToken,
         merchant_id: merchant.id,
         campaign_id: campaign.id,
-        amount: Number(amount),
+        amount: storedAmount,
         expires_at: expiresAt,
       });
 
@@ -83,13 +91,12 @@ export default function TransactionPage() {
         return;
       }
 
-      // Generate QR code
       const scanUrl = `${window.location.origin}/scan/${newToken}`;
       const dataUrl = await QRCode.toDataURL(scanUrl, {
         width: 300,
         margin: 2,
         color: {
-          dark: '#000000',
+          dark: isReturn ? '#dc2626' : '#000000',
           light: '#ffffff',
         },
       });
@@ -99,7 +106,6 @@ export default function TransactionPage() {
       setCountdown(60);
       setState('qr');
 
-      // Start countdown
       countdownRef.current = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
@@ -112,7 +118,6 @@ export default function TransactionPage() {
         });
       }, 1000);
 
-      // Start polling for scan status
       pollRef.current = setInterval(async () => {
         const { data: tokenData } = await supabase
           .from('qr_tokens')
@@ -124,7 +129,6 @@ export default function TransactionPage() {
           if (countdownRef.current) clearInterval(countdownRef.current);
           if (pollRef.current) clearInterval(pollRef.current);
 
-          // Get customer info
           const { data: txn } = await supabase
             .from('transactions')
             .select('*, enrollment:enrollments(*, customer:customers(*))')
@@ -154,6 +158,7 @@ export default function TransactionPage() {
     setToken('');
     setCountdown(60);
     setScannedCustomer('');
+    setMode('purchase');
   }, []);
 
   const circumference = 2 * Math.PI * 36;
@@ -196,18 +201,81 @@ export default function TransactionPage() {
           <div className="slide-up">
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
               <h1 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.25rem' }}>
-                New Transaction
+                {isReturn ? 'Process Return' : 'New Transaction'}
               </h1>
               <p style={{ color: 'var(--text-secondary)' }}>
-                {campaign.campaign_type === 'amount' ? 'Enter bill amount' : 'Log a visit'}
+                {campaign.campaign_type === 'amount'
+                  ? isReturn ? 'Enter refund amount' : 'Enter bill amount'
+                  : 'Log a visit'}
               </p>
             </div>
 
-            <div className="card" style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
+            {/* Purchase / Return toggle — only for amount campaigns */}
+            {campaign.campaign_type === 'amount' && (
+              <div
+                style={{
+                  display: 'flex',
+                  background: 'var(--bg-surface)',
+                  borderRadius: '12px',
+                  padding: '4px',
+                  marginBottom: '1.5rem',
+                  gap: '4px',
+                }}
+                id="txn-mode-toggle"
+              >
+                <button
+                  onClick={() => setMode('purchase')}
+                  style={{
+                    flex: 1,
+                    padding: '0.6rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontWeight: 700,
+                    fontSize: '0.9rem',
+                    background: mode === 'purchase' ? 'var(--primary)' : 'transparent',
+                    color: mode === 'purchase' ? '#fff' : 'var(--text-muted)',
+                    transition: 'all 0.2s',
+                  }}
+                  id="toggle-purchase"
+                >
+                  + Purchase
+                </button>
+                <button
+                  onClick={() => setMode('return')}
+                  style={{
+                    flex: 1,
+                    padding: '0.6rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontWeight: 700,
+                    fontSize: '0.9rem',
+                    background: mode === 'return' ? '#dc2626' : 'transparent',
+                    color: mode === 'return' ? '#fff' : 'var(--text-muted)',
+                    transition: 'all 0.2s',
+                  }}
+                  id="toggle-return"
+                >
+                  − Return
+                </button>
+              </div>
+            )}
+
+            <div
+              className="card"
+              style={{
+                marginBottom: '1.5rem',
+                textAlign: 'center',
+                borderColor: isReturn ? 'rgba(220, 38, 38, 0.4)' : undefined,
+                background: isReturn ? 'rgba(220, 38, 38, 0.03)' : undefined,
+                transition: 'border-color 0.2s, background 0.2s',
+              }}
+            >
               {campaign.campaign_type === 'amount' ? (
                 <>
                   <label className="label" style={{ textAlign: 'center', fontSize: '1rem' }}>
-                    Bill Amount
+                    {isReturn ? 'Refund Amount' : 'Bill Amount'}
                   </label>
                   <div style={{ position: 'relative' }}>
                     <span style={{
@@ -217,8 +285,11 @@ export default function TransactionPage() {
                       transform: 'translateY(-50%)',
                       fontSize: '1.5rem',
                       fontWeight: 700,
-                      color: 'var(--text-muted)',
-                    }}>₹</span>
+                      color: isReturn ? '#dc2626' : 'var(--text-muted)',
+                      transition: 'color 0.2s',
+                    }}>
+                      {isReturn ? '−₹' : '₹'}
+                    </span>
                     <input
                       type="number"
                       className="input input-lg"
@@ -227,10 +298,20 @@ export default function TransactionPage() {
                       onChange={(e) => setAmount(e.target.value)}
                       autoFocus
                       min="1"
-                      style={{ paddingLeft: '2.5rem' }}
+                      style={{
+                        paddingLeft: '3rem',
+                        borderColor: isReturn ? '#dc2626' : undefined,
+                        color: isReturn ? '#dc2626' : undefined,
+                        transition: 'border-color 0.2s, color 0.2s',
+                      }}
                       id="amount-input"
                     />
                   </div>
+                  {isReturn && amount && (
+                    <p style={{ fontSize: '0.78rem', color: '#dc2626', marginTop: '0.5rem', opacity: 0.8 }}>
+                      This will subtract ₹{amount} from the customer&apos;s total
+                    </p>
+                  )}
                 </>
               ) : (
                 <div>
@@ -238,7 +319,6 @@ export default function TransactionPage() {
                   <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
                     Log a visit for this customer
                   </p>
-                  {/* For visits, amount defaults to 0 */}
                 </div>
               )}
             </div>
@@ -252,12 +332,22 @@ export default function TransactionPage() {
               }}
               className="btn btn-primary btn-full btn-lg"
               disabled={loading || (campaign.campaign_type === 'amount' && !amount)}
+              style={{
+                background: isReturn
+                  ? 'linear-gradient(135deg, #dc2626, #b91c1c)'
+                  : undefined,
+                boxShadow: isReturn
+                  ? '0 4px 15px rgba(220, 38, 38, 0.35)'
+                  : undefined,
+              }}
               id="generate-qr-btn"
             >
               {loading ? (
                 <>
                   <span className="spinner" /> Generating...
                 </>
+              ) : isReturn ? (
+                '↩ Generate Return QR'
               ) : (
                 '📱 Generate QR Code'
               )}
@@ -269,16 +359,27 @@ export default function TransactionPage() {
         {state === 'qr' && (
           <div className="slide-up" style={{ textAlign: 'center' }}>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>
-              Show to Customer
+              {isReturn ? 'Return QR — Show to Customer' : 'Show to Customer'}
             </h2>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+            <p style={{
+              color: isReturn ? '#dc2626' : 'var(--text-secondary)',
+              marginBottom: '1.5rem',
+              fontWeight: isReturn ? 700 : 400,
+            }}>
               {campaign.campaign_type === 'amount'
-                ? `${formatCurrency(Number(amount))} transaction`
+                ? isReturn
+                  ? `−${formatCurrency(Number(amount))} refund`
+                  : `${formatCurrency(Number(amount))} transaction`
                 : 'Visit log'}
             </p>
 
-            {/* QR Code */}
-            <div className="qr-container" style={{ margin: '0 auto 1.5rem' }}>
+            <div
+              className="qr-container"
+              style={{
+                margin: '0 auto 1.5rem',
+                borderColor: isReturn ? 'rgba(220,38,38,0.4)' : undefined,
+              }}
+            >
               {qrDataUrl && (
                 <img
                   src={qrDataUrl}
@@ -289,7 +390,20 @@ export default function TransactionPage() {
               )}
             </div>
 
-            {/* Countdown */}
+            {isReturn && (
+              <div style={{
+                background: 'rgba(220, 38, 38, 0.08)',
+                border: '1px solid rgba(220, 38, 38, 0.25)',
+                borderRadius: '8px',
+                padding: '0.6rem 1rem',
+                marginBottom: '1rem',
+                fontSize: '0.85rem',
+                color: '#dc2626',
+              }}>
+                ↩ Return / Refund QR
+              </div>
+            )}
+
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
               <div className="countdown-ring">
                 <svg width="80" height="80">
@@ -302,7 +416,7 @@ export default function TransactionPage() {
                     strokeDasharray={circumference}
                     strokeDashoffset={offset}
                     style={{
-                      stroke: countdown <= 10 ? 'var(--danger)' : 'var(--primary)',
+                      stroke: countdown <= 10 ? 'var(--danger)' : (isReturn ? '#dc2626' : 'var(--primary)'),
                     }}
                   />
                 </svg>
@@ -330,28 +444,32 @@ export default function TransactionPage() {
         {/* SUCCESS STATE */}
         {state === 'success' && (
           <div className="slide-up" style={{ textAlign: 'center' }}>
-            <div
-              style={{
-                width: '80px',
-                height: '80px',
-                borderRadius: '50%',
-                background: 'rgba(16, 185, 129, 0.15)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '2.5rem',
-                margin: '0 auto 1.5rem',
-                border: '2px solid var(--primary)',
-              }}
-            >
-              ✅
+            <div style={{
+              width: '80px',
+              height: '80px',
+              borderRadius: '50%',
+              background: isReturn ? 'rgba(220, 38, 38, 0.12)' : 'rgba(16, 185, 129, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '2.5rem',
+              margin: '0 auto 1.5rem',
+              border: `2px solid ${isReturn ? '#dc2626' : 'var(--primary)'}`,
+            }}>
+              {isReturn ? '↩' : '✅'}
             </div>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.5rem' }}>
-              Transaction Recorded!
+              {isReturn ? 'Return Processed!' : 'Transaction Recorded!'}
             </h2>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+            <p style={{
+              color: isReturn ? '#dc2626' : 'var(--text-secondary)',
+              marginBottom: '0.5rem',
+              fontWeight: isReturn ? 700 : 400,
+            }}>
               {campaign.campaign_type === 'amount'
-                ? `${formatCurrency(Number(amount))} logged`
+                ? isReturn
+                  ? `−${formatCurrency(Number(amount))} refunded`
+                  : `${formatCurrency(Number(amount))} logged`
                 : 'Visit logged'}
             </p>
             {scannedCustomer && (
@@ -378,20 +496,18 @@ export default function TransactionPage() {
         {/* EXPIRED STATE */}
         {state === 'expired' && (
           <div className="slide-up" style={{ textAlign: 'center' }}>
-            <div
-              style={{
-                width: '80px',
-                height: '80px',
-                borderRadius: '50%',
-                background: 'rgba(239, 68, 68, 0.15)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '2.5rem',
-                margin: '0 auto 1.5rem',
-                border: '2px solid var(--danger)',
-              }}
-            >
+            <div style={{
+              width: '80px',
+              height: '80px',
+              borderRadius: '50%',
+              background: 'rgba(239, 68, 68, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '2.5rem',
+              margin: '0 auto 1.5rem',
+              border: '2px solid var(--danger)',
+            }}>
               ⏰
             </div>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.5rem' }}>

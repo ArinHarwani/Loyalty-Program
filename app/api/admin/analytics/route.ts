@@ -36,6 +36,7 @@ export async function GET() {
     const { data: enrollments } = await service.from('enrollments').select('*');
     const { data: transactions } = await service.from('transactions').select('*');
     const { data: messageLogs } = await service.from('message_logs').select('*');
+    const { data: subscriptions } = await service.from('subscriptions').select('*');
 
     const allMerchants = merchants || [];
     const allCustomers = customers || [];
@@ -43,6 +44,7 @@ export async function GET() {
     const allEnrollments = enrollments || [];
     const allTransactions = transactions || [];
     const allLogs = messageLogs || [];
+    const allSubscriptions = subscriptions || [];
 
     // Acquisition — new merchants per month (12 months)
     const newMerchantsPerMonth: { month: string; count: number }[] = [];
@@ -141,6 +143,36 @@ export async function GET() {
       marketing: allLogs.filter(l => l.category === 'marketing').length,
     };
 
+    // Calculate revenue stats
+    const totalRevenue = allSubscriptions.reduce((s, sub) => s + Number(sub.price), 0);
+    const mrr = allSubscriptions
+      .filter(s => s.status === 'active')
+      .reduce((s, sub) => s + Number(sub.price), 0);
+      
+    // Revenue by plan
+    const revenueByPlan = allSubscriptions.reduce((acc, sub) => {
+      acc[sub.plan_name] = (acc[sub.plan_name] || 0) + Number(sub.price);
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Upcoming renewals (next 30 days)
+    const thirtyDaysFromNow = new Date(now);
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+    const upcomingRenewalsStr = thirtyDaysFromNow.toISOString().split('T')[0];
+    
+    const upcomingRenewals = allMerchants
+      .filter(m => 
+        m.subscription_status === 'active' && 
+        m.subscription_end_date && 
+        m.subscription_end_date <= upcomingRenewalsStr
+      )
+      .map(m => ({
+        shop_name: m.shop_name,
+        end_date: m.subscription_end_date,
+        plan: m.subscription_plan,
+      }))
+      .sort((a, b) => (a.end_date || '').localeCompare(b.end_date || ''));
+
     return NextResponse.json({
       acquisition: {
         new_merchants_per_month: newMerchantsPerMonth,
@@ -161,6 +193,13 @@ export async function GET() {
         total_messages: allLogs.length,
         total_cost: allLogs.reduce((s, l) => s + Number(l.cost), 0),
       },
+      revenue: {
+        total: totalRevenue,
+        mrr: mrr,
+        avg_per_merchant: allMerchants.length > 0 ? totalRevenue / allMerchants.length : 0,
+        by_plan: revenueByPlan,
+        upcoming_renewals: upcomingRenewals,
+      }
     });
   } catch (error) {
     console.error('Admin analytics error:', error);

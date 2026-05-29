@@ -33,7 +33,60 @@ export async function middleware(request: NextRequest) {
 
   // Refresh session if expired - required for Server Components
   // https://supabase.com/docs/guides/auth/server-side/nextjs
-  await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { pathname } = request.nextUrl;
+
+  // Protect /merchant routes (except /merchant/login and /merchant/signup)
+  if (pathname.startsWith('/merchant') && !pathname.startsWith('/merchant/login') && !pathname.startsWith('/merchant/signup')) {
+    if (!user) {
+      return NextResponse.redirect(new URL('/merchant/login', request.url));
+    }
+
+    // Check subscription status
+    const serviceRoleClient = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        cookies: {
+          getAll() { return request.cookies.getAll(); },
+          setAll() {},
+        },
+      }
+    );
+
+    const { data: merchant } = await serviceRoleClient
+      .from('merchants')
+      .select('subscription_status')
+      .eq('email', user.email)
+      .single();
+
+    if (merchant) {
+      // Hard block — cannot access anything
+      if (merchant.subscription_status === 'blocked') {
+        if (!pathname.startsWith('/merchant/suspended')) {
+          return NextResponse.redirect(new URL('/merchant/suspended', request.url));
+        }
+      } else if (merchant.subscription_status === 'inactive') {
+        // Not yet activated — send to pending page
+        if (!pathname.startsWith('/merchant/pending')) {
+          return NextResponse.redirect(new URL('/merchant/pending', request.url));
+        }
+      } else {
+        // Active - restrict access to pending/suspended pages
+        if (pathname.startsWith('/merchant/pending') || pathname.startsWith('/merchant/suspended')) {
+          return NextResponse.redirect(new URL('/merchant/dashboard', request.url));
+        }
+      }
+    }
+  }
+
+  // Protect /admin routes
+  if (pathname.startsWith('/admin')) {
+    if (!user || user.email !== process.env.ADMIN_EMAIL) {
+      return NextResponse.redirect(new URL('/merchant/login', request.url));
+    }
+  }
 
   return response;
 }

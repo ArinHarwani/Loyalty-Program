@@ -39,6 +39,11 @@ export async function GET() {
       .select('*')
       .order('created_at', { ascending: false });
 
+    // Get all subscriptions
+    const { data: subscriptions } = await service
+      .from('subscriptions')
+      .select('*');
+
     // Get all message logs
     const { data: messageLogs } = await service
       .from('message_logs')
@@ -61,6 +66,7 @@ export async function GET() {
     const allCampaigns = campaigns || [];
     const allTransactions = transactions || [];
     const allEnrollments = enrollments || [];
+    const allSubscriptions = subscriptions || [];
 
     // MTD logs
     const mtdLogs = allLogs.filter(l => l.sent_at >= startOfMonth);
@@ -88,6 +94,9 @@ export async function GET() {
         email: m.email,
         current_package: m.current_package || 'trial',
         status: m.status || 'active',
+        subscription_status: m.subscription_status || 'inactive',
+        subscription_plan: m.subscription_plan || null,
+        subscription_end_date: m.subscription_end_date || null,
         campaigns: mCampaigns.length,
         customers_this_month: customerIds.size,
         transactions_this_month: mTransMTD.length,
@@ -170,12 +179,16 @@ export async function GET() {
       const monthCost = allLogs
         .filter(l => l.sent_at >= monthStart && l.sent_at < nextMonth)
         .reduce((s, l) => s + Number(l.cost), 0);
+        
+      const monthRevenue = allSubscriptions
+        .filter(s => s.start_date >= monthStart && s.start_date < nextMonth)
+        .reduce((s, sub) => s + Number(sub.price), 0);
 
       monthlyChart.push({
         month: monthLabel,
-        revenue: 0, // Package billing revenue — populated when billing is implemented
+        revenue: monthRevenue,
         cost: monthCost,
-        margin: -monthCost,
+        margin: monthRevenue - monthCost,
       });
     }
 
@@ -186,16 +199,46 @@ export async function GET() {
       marketing: allLogs.filter(l => l.category === 'marketing').reduce((s, l) => s + Number(l.cost), 0),
     };
 
+    // Calculate MRR
+    const mrr = allSubscriptions
+      .filter(s => s.status === 'active')
+      .reduce((s, sub) => s + Number(sub.price), 0);
+      
+    // Calculate MTD Revenue
+    const revenueMtd = allSubscriptions
+      .filter(s => s.start_date >= startOfMonth)
+      .reduce((s, sub) => s + Number(sub.price), 0);
+      
+    // Expiring Soon (Next 7 Days)
+    const sevenDaysFromNow = new Date(now);
+    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+    const expiringSoonStr = sevenDaysFromNow.toISOString().split('T')[0];
+    
+    const expiringSoon = merchantStats.filter(m => 
+      m.subscription_status === 'active' && 
+      m.subscription_end_date && 
+      m.subscription_end_date <= expiringSoonStr
+    );
+
     return NextResponse.json({
       stats: {
         total_merchants: allMerchants.length,
-        active_merchants: allMerchants.filter(m => (m.status || 'active') === 'active').length,
+        active_merchants: allMerchants.filter(m => (m.subscription_status || 'inactive') === 'active').length,
+        inactive_merchants: allMerchants.filter(m => (m.subscription_status || 'inactive') === 'inactive').length,
+        blocked_merchants: allMerchants.filter(m => (m.subscription_status || 'inactive') === 'blocked').length,
         total_customers: (customers || []).length,
         total_transactions: allTransactions.length,
-        revenue_mtd: 0,
+        revenue_mtd: revenueMtd,
         whatsapp_cost_mtd: mtdLogs.reduce((s, l) => s + Number(l.cost), 0),
-        margin_mtd: 0,
+        margin_mtd: revenueMtd - mtdLogs.reduce((s, l) => s + Number(l.cost), 0),
+        mrr,
       },
+      subscription_health: {
+        active: allMerchants.filter(m => (m.subscription_status || 'inactive') === 'active').length,
+        inactive: allMerchants.filter(m => (m.subscription_status || 'inactive') === 'inactive').length,
+        blocked: allMerchants.filter(m => (m.subscription_status || 'inactive') === 'blocked').length,
+      },
+      expiring_soon: expiringSoon,
       merchants: merchantStats,
       churn_risks: churnRisks,
       recent_activity: recentSlice,

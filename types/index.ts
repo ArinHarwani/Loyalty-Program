@@ -13,6 +13,9 @@ export interface Merchant {
   merchant_code: string | null;
   current_package: string;
   status: string;
+  subscription_status: 'inactive' | 'active' | 'blocked';
+  subscription_end_date: string | null;
+  subscription_plan: string | null;
   last_login_at: string | null;
   notes: string | null;
   created_at: string;
@@ -99,9 +102,23 @@ export interface MerchantPackage {
 export interface MerchantStatusLog {
   id: string;
   merchant_id: string;
-  status: 'active' | 'inactive' | 'churned' | 'trial';
+  status: 'active' | 'inactive' | 'churned' | 'trial' | 'blocked';
   changed_at: string;
   reason: string | null;
+}
+
+export interface Subscription {
+  id: string;
+  merchant_id: string;
+  plan_name: 'starter' | 'growth' | 'custom';
+  price: number;
+  start_date: string;
+  end_date: string;
+  status: 'active' | 'expired' | 'cancelled';
+  payment_method: string;
+  utr_number: string | null;
+  notes: string | null;
+  created_at: string;
 }
 
 // --- API Request / Response Types ---
@@ -182,7 +199,16 @@ export interface AdminOverview {
     revenue_mtd: number;
     whatsapp_cost_mtd: number;
     margin_mtd: number;
+    blocked_merchants: number;
+    inactive_merchants: number;
+    mrr: number;
   };
+  subscription_health: {
+    active: number;
+    inactive: number;
+    blocked: number;
+  };
+  expiring_soon: AdminMerchantRow[];
   merchants: AdminMerchantRow[];
   churn_risks: ChurnRiskMerchant[];
   recent_activity: ActivityEvent[];
@@ -201,6 +227,9 @@ export interface AdminMerchantRow {
   email: string;
   current_package: string;
   status: string;
+  subscription_status: 'inactive' | 'active' | 'blocked';
+  subscription_plan: string | null;
+  subscription_end_date: string | null;
   campaigns: number;
   customers_this_month: number;
   transactions_this_month: number;
@@ -228,6 +257,7 @@ export interface ActivityEvent {
 export interface AdminMerchantDetail {
   merchant: Merchant;
   package_history: MerchantPackage[];
+  subscription_history: Subscription[];
   campaigns: AdminCampaignRow[];
   sales_chart_daily: { date: string; transactions: number; amount: number }[];
   sales_chart_monthly: { month: string; transactions: number; amount: number }[];

@@ -306,12 +306,22 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {transactions.map((txn) => (
-                    <tr key={txn.id}>
-                      <td style={{ fontWeight: 600 }}>{formatCurrency(txn.amount)}</td>
-                      <td style={{ color: 'var(--text-secondary)' }}>{formatDateTime(txn.scanned_at)}</td>
-                    </tr>
-                  ))}
+                  {transactions.map((txn) => {
+                    const isReturn = txn.amount < 0;
+                    return (
+                      <tr key={txn.id}>
+                        <td style={{
+                          fontWeight: 700,
+                          color: isReturn ? '#dc2626' : 'var(--primary)',
+                        }}>
+                          {isReturn
+                            ? `−${formatCurrency(Math.abs(txn.amount))}`
+                            : `+${formatCurrency(txn.amount)}`}
+                        </td>
+                        <td style={{ color: 'var(--text-secondary)' }}>{formatDateTime(txn.scanned_at)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

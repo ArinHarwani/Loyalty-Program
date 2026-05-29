@@ -6,11 +6,17 @@ import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils';
 import Link from 'next/link';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, BarChart, Bar,
+  ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell,
 } from 'recharts';
 import type { AdminOverview, AdminMerchantRow } from '@/types';
 
-type SortKey = 'shop_name' | 'customers_this_month' | 'transactions_this_month' | 'whatsapp_cost_this_month' | 'created_at';
+type SortKey = 'shop_name' | 'customers_this_month' | 'transactions_this_month' | 'whatsapp_cost_this_month' | 'created_at' | 'subscription_end_date';
+
+const COLORS = {
+  active: 'var(--success)',
+  inactive: 'var(--warning)',
+  blocked: 'var(--danger)',
+};
 
 export default function AdminPage() {
   const [data, setData] = useState<AdminOverview | null>(null);
@@ -57,6 +63,8 @@ export default function AdminPage() {
   const sortedMerchants = (data?.merchants || []).slice().sort((a, b) => {
     const aVal = a[sortKey];
     const bVal = b[sortKey];
+    if (aVal === null || aVal === undefined) return 1;
+    if (bVal === null || bVal === undefined) return -1;
     if (typeof aVal === 'string' && typeof bVal === 'string') {
       return sortAsc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
     }
@@ -93,6 +101,12 @@ export default function AdminPage() {
     return sortAsc ? ' ↑' : ' ↓';
   };
 
+  const pieData = [
+    { name: 'Active', value: data.subscription_health.active, color: COLORS.active },
+    { name: 'Inactive', value: data.subscription_health.inactive, color: COLORS.inactive },
+    { name: 'Blocked', value: data.subscription_health.blocked, color: COLORS.blocked },
+  ].filter(d => d.value > 0);
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
       <nav className="nav">
@@ -110,55 +124,85 @@ export default function AdminPage() {
           Overview of all merchants and platform metrics
         </p>
 
+        {/* Expiring Soon Alert */}
+        {data.expiring_soon?.length > 0 && (
+          <div className="card" style={{ marginBottom: '1.5rem', borderColor: 'var(--warning)', background: 'rgba(234, 179, 8, 0.05)' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem', color: 'var(--warning)' }}>
+              ⚠️ Subscriptions Expiring Soon ({data.expiring_soon.length})
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+              {data.expiring_soon.map(m => (
+                <div key={m.id} style={{ padding: '1rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{m.shop_name}</div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Ends: {formatDate(m.subscription_end_date!)}</div>
+                  </div>
+                  <Link href={`/admin/merchants/${m.id}`} className="btn btn-sm btn-primary">Renew</Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Top Stats Row */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
           {[
-            { label: 'Merchants', value: data.stats.total_merchants, icon: '🏪', color: 'var(--primary)' },
-            { label: 'Active', value: data.stats.active_merchants, icon: '✅', color: 'var(--primary-light)' },
-            { label: 'Customers', value: data.stats.total_customers, icon: '👥', color: 'var(--accent)' },
-            { label: 'Transactions', value: data.stats.total_transactions, icon: '🧾', color: '#a855f7' },
-            { label: 'WA Cost (MTD)', value: formatCurrency(data.stats.whatsapp_cost_mtd), icon: '💬', color: 'var(--warning)' },
+            { label: 'Total Merchants', value: data.stats.total_merchants, icon: '🏪', color: 'var(--text-primary)' },
+            { label: 'Active Now', value: data.stats.active_merchants, icon: '✅', color: 'var(--success)' },
+            { label: 'Inactive (Pending)', value: data.stats.inactive_merchants, icon: '⏳', color: 'var(--warning)' },
+            { label: 'Blocked', value: data.stats.blocked_merchants, icon: '🚫', color: 'var(--danger)' },
+            { label: 'MRR', value: formatCurrency(data.stats.mrr), icon: '📈', color: 'var(--primary)' },
+            { label: 'Collections (MTD)', value: formatCurrency(data.stats.revenue_mtd), icon: '💰', color: 'var(--success)' },
           ].map(stat => (
             <div key={stat.label} className="card stat-card">
               <div style={{ fontSize: '1.25rem', marginBottom: '0.35rem' }}>{stat.icon}</div>
-              <div className="stat-value" style={{ color: stat.color, fontSize: '1.5rem' }}>{stat.value}</div>
+              <div className="stat-value" style={{ color: stat.color, fontSize: '1.4rem' }}>{stat.value}</div>
               <div className="stat-label">{stat.label}</div>
             </div>
           ))}
         </div>
 
-        {/* Cost Breakdown */}
-        <div className="card" style={{ marginBottom: '1.5rem' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>
-            💸 WhatsApp Cost Breakdown
-          </h3>
-          <div className="grid-3">
-            <div className="stat-card card-static">
-              <div className="stat-value" style={{ color: 'var(--primary)', fontSize: '1.25rem' }}>
-                {formatCurrency(data.costBreakdown.service)}
-              </div>
-              <div className="stat-label">Service (Free)</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+          {/* Subscription Health */}
+          <div className="card">
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>
+              🏥 Subscription Health
+            </h3>
+            <div style={{ height: 250, width: '100%' }}>
+              <ResponsiveContainer>
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
-            <div className="stat-card card-static">
-              <div className="stat-value" style={{ color: 'var(--accent)', fontSize: '1.25rem' }}>
-                {formatCurrency(data.costBreakdown.utility)}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: COLORS.active }}></span> Active ({data.subscription_health.active})
               </div>
-              <div className="stat-label">Utility (₹0.11)</div>
-            </div>
-            <div className="stat-card card-static">
-              <div className="stat-value" style={{ color: 'var(--warning)', fontSize: '1.25rem' }}>
-                {formatCurrency(data.costBreakdown.marketing)}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: COLORS.inactive }}></span> Inactive ({data.subscription_health.inactive})
               </div>
-              <div className="stat-label">Marketing (₹0.90)</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: COLORS.blocked }}></span> Blocked ({data.subscription_health.blocked})
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Monthly WhatsApp Cost Chart */}
-        {data.monthly_revenue_chart.length > 0 && (
-          <div className="card" style={{ marginBottom: '1.5rem' }}>
+          {/* Monthly Revenue Chart */}
+          <div className="card">
             <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>
-              📊 Monthly WhatsApp Costs (12 months)
+              📊 Monthly Collections (12 months)
             </h3>
             <div style={{ width: '100%', height: 280 }}>
               <ResponsiveContainer>
@@ -174,12 +218,12 @@ export default function AdminPage() {
                       color: 'var(--text-primary)',
                     }}
                   />
-                  <Bar dataKey="cost" fill="var(--warning)" radius={[4, 4, 0, 0]} name="WhatsApp Cost (₹)" />
+                  <Bar dataKey="revenue" fill="var(--success)" radius={[4, 4, 0, 0]} name="Revenue (₹)" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
-        )}
+        </div>
 
         {/* Churn Risks */}
         {data.churn_risks.length > 0 && (
@@ -218,61 +262,75 @@ export default function AdminPage() {
         {/* Merchant Health Table */}
         <div className="card" style={{ marginBottom: '1.5rem' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>
-            🏪 Merchant Health
+            🏪 Merchants
           </h3>
           <div className="table-container">
             <table>
               <thead>
                 <tr>
-                  <th onClick={() => handleSort('shop_name')} style={{ cursor: 'pointer' }}>
-                    Shop Name{sortIcon('shop_name')}
-                  </th>
-                  <th>Package</th>
+                  <th onClick={() => handleSort('shop_name')} style={{ cursor: 'pointer' }}>Shop Name{sortIcon('shop_name')}</th>
+                  <th>Category</th>
+                  <th>Plan</th>
                   <th>Status</th>
-                  <th onClick={() => handleSort('customers_this_month')} style={{ cursor: 'pointer' }}>
-                    Customers (MTD){sortIcon('customers_this_month')}
-                  </th>
-                  <th onClick={() => handleSort('transactions_this_month')} style={{ cursor: 'pointer' }}>
-                    Txns (MTD){sortIcon('transactions_this_month')}
-                  </th>
-                  <th onClick={() => handleSort('whatsapp_cost_this_month')} style={{ cursor: 'pointer' }}>
-                    WA Cost (MTD){sortIcon('whatsapp_cost_this_month')}
-                  </th>
-                  <th onClick={() => handleSort('created_at')} style={{ cursor: 'pointer' }}>
-                    Joined{sortIcon('created_at')}
-                  </th>
+                  <th onClick={() => handleSort('subscription_end_date')} style={{ cursor: 'pointer' }}>Sub End{sortIcon('subscription_end_date')}</th>
+                  <th>Days Left</th>
+                  <th onClick={() => handleSort('created_at')} style={{ cursor: 'pointer' }}>Joined{sortIcon('created_at')}</th>
                   <th>Action</th>
                 </tr>
               </thead>
               <tbody>
-                {sortedMerchants.map((m: AdminMerchantRow) => (
-                  <tr key={m.id}>
-                    <td style={{ fontWeight: 600 }}>{m.shop_name}</td>
-                    <td>
-                      <span className={`badge ${m.current_package === 'growth' ? 'badge-success' : m.current_package === 'starter' ? 'badge-info' : 'badge-muted'}`}>
-                        {m.current_package}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`badge ${m.status === 'active' ? 'badge-success' : m.status === 'churned' ? 'badge-danger' : 'badge-warning'}`}>
-                        {m.status}
-                      </span>
-                    </td>
-                    <td>{m.customers_this_month}</td>
-                    <td>{m.transactions_this_month}</td>
-                    <td>{formatCurrency(m.whatsapp_cost_this_month)}</td>
-                    <td style={{ color: 'var(--text-muted)' }}>{formatDate(m.created_at)}</td>
-                    <td>
-                      <Link
-                        href={`/admin/merchants/${m.id}`}
-                        className="btn btn-sm btn-secondary"
-                        style={{ textDecoration: 'none' }}
-                      >
-                        View →
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
+                {sortedMerchants.map((m: AdminMerchantRow) => {
+                  let daysLeftText = '-';
+                  if (m.subscription_status === 'active' && m.subscription_end_date) {
+                    const diffTime = new Date(m.subscription_end_date).getTime() - new Date().getTime();
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    if (diffDays < 0) daysLeftText = 'Expired';
+                    else daysLeftText = `${diffDays} days`;
+                  } else if (m.subscription_status === 'blocked') {
+                    daysLeftText = 'Blocked';
+                  } else if (m.subscription_status === 'inactive') {
+                    daysLeftText = 'No sub';
+                  }
+
+                  return (
+                    <tr key={m.id}>
+                      <td style={{ fontWeight: 600 }}>{m.shop_name}</td>
+                      <td>{m.shop_category || '-'}</td>
+                      <td>
+                        <span className={`badge ${m.subscription_plan === 'growth' ? 'badge-success' : m.subscription_plan === 'starter' ? 'badge-info' : 'badge-muted'}`}>
+                          {m.subscription_plan || 'None'}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`badge ${m.subscription_status === 'active' ? 'badge-success' : m.subscription_status === 'blocked' ? 'badge-danger' : 'badge-warning'}`}>
+                          {m.subscription_status}
+                        </span>
+                      </td>
+                      <td style={{ color: 'var(--text-muted)' }}>
+                        {m.subscription_end_date ? formatDate(m.subscription_end_date) : '-'}
+                      </td>
+                      <td>
+                        <span style={{ 
+                          color: daysLeftText === 'Expired' || daysLeftText === 'Blocked' ? 'var(--danger)' : 
+                                daysLeftText === 'No sub' ? 'var(--warning)' : 
+                                (parseInt(daysLeftText) <= 7 ? 'var(--warning)' : 'var(--text-primary)') 
+                        }}>
+                          {daysLeftText}
+                        </span>
+                      </td>
+                      <td style={{ color: 'var(--text-muted)' }}>{formatDate(m.created_at)}</td>
+                      <td>
+                        <Link
+                          href={`/admin/merchants/${m.id}`}
+                          className="btn btn-sm btn-secondary"
+                          style={{ textDecoration: 'none' }}
+                        >
+                          View →
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

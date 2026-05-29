@@ -217,33 +217,45 @@ export default function ProgressPage() {
               📋 Transaction History
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {transactions.map((txn, i) => (
-                <div
-                  key={txn.id}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '0.625rem 0.75rem',
-                    background: 'var(--bg-surface)',
-                    borderRadius: 'var(--radius-sm)',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', width: '24px' }}>
-                      #{transactions.length - i}
-                    </span>
-                    <span style={{ fontWeight: 600 }}>
-                      {campaign.campaign_type === 'amount'
-                        ? formatCurrency(txn.amount)
-                        : 'Visit'}
+              {transactions.map((txn, i) => {
+                const isReturn = txn.amount < 0;
+                return (
+                  <div
+                    key={txn.id}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '0.625rem 0.75rem',
+                      background: 'var(--bg-surface)',
+                      borderRadius: 'var(--radius-sm)',
+                      borderLeft: isReturn ? '3px solid #dc2626' : '3px solid var(--primary)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', width: '24px' }}>
+                        #{transactions.length - i}
+                      </span>
+                      <span style={{
+                        fontWeight: 700,
+                        color: isReturn ? '#dc2626' : 'var(--primary)',
+                      }}>
+                        {campaign.campaign_type === 'amount'
+                          ? isReturn
+                            ? `−${formatCurrency(Math.abs(txn.amount))}`
+                            : `+${formatCurrency(txn.amount)}`
+                          : 'Visit'}
+                      </span>
+                      {isReturn && (
+                        <span style={{ fontSize: '0.7rem', color: '#dc2626', opacity: 0.7 }}>↩ return</span>
+                      )}
+                    </div>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                      {formatDateTime(txn.scanned_at)}
                     </span>
                   </div>
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                    {formatDateTime(txn.scanned_at)}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

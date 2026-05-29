@@ -36,12 +36,18 @@ export default function OnboardingPage() {
         // Check if merchant already exists
         supabase
           .from('merchants')
-          .select('id')
+          .select('id, subscription_status')
           .eq('email', user.email)
           .single()
           .then(({ data }) => {
             if (data) {
-              router.push('/merchant/dashboard');
+              if (data.subscription_status === 'inactive') {
+                router.push('/merchant/pending');
+              } else if (data.subscription_status === 'blocked') {
+                router.push('/merchant/suspended');
+              } else {
+                router.push('/merchant/dashboard');
+              }
             }
           });
       }
@@ -64,12 +70,13 @@ export default function OnboardingPage() {
         shop_name: shopName,
         shop_category: category,
         merchant_code: merchantCode,
+        subscription_status: 'inactive',
       });
 
       if (insertError) {
         setError(insertError.message);
       } else {
-        router.push('/merchant/dashboard');
+        router.push('/merchant/pending');
       }
     } catch {
       setError('Something went wrong. Please try again.');
