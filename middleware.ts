@@ -76,6 +76,11 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/merchant/login', request.url));
     }
 
+    // If the logged in user is the admin and they land on dashboard/onboarding, route them to /admin
+    if (user.email === process.env.ADMIN_EMAIL && (pathname === '/merchant/dashboard' || pathname === '/merchant/onboarding')) {
+      return NextResponse.redirect(new URL('/admin', request.url));
+    }
+
     // Check subscription status
     const serviceRoleClient = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
