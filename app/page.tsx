@@ -97,7 +97,7 @@ export default function LandingPage() {
 
           <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
             <Link href="/merchant/login" className="btn btn-primary btn-lg pulse-glow">
-              🚀 Get Started Free
+              🚀 Get Started
             </Link>
             <a href="#features" className="btn btn-secondary btn-lg">
               See How It Works
@@ -116,7 +116,7 @@ export default function LandingPage() {
           >
             {[
               { label: 'No App Download', icon: '📱' },
-              { label: 'Free to Start', icon: '💰' },
+              { label: 'Quick Setup', icon: '⚡' },
               { label: 'WhatsApp Updates', icon: '💬' },
             ].map((item) => (
               <div
@@ -339,10 +339,10 @@ export default function LandingPage() {
           Ready to Reward Your Customers?
         </h2>
         <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
-          Set up in 5 minutes. No credit card needed.
+          Set up your campaign in minutes and start rewarding.
         </p>
         <Link href="/merchant/login" className="btn btn-primary btn-lg">
-          Start Free Trial →
+          Get Started Now →
         </Link>
       </section>
 
