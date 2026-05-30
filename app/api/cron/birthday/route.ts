@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase';
-import { sendWhatsAppMessage } from '@/lib/whatsapp';
+import { sendWhatsAppMessage, composeBirthdayMessage } from '@/lib/whatsapp';
 
 export async function GET(request: NextRequest) {
   // Verify cron secret
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
       for (const [, merchant] of merchants) {
         await sendWhatsAppMessage(
           customer.whatsapp_number,
-          `🎂 Happy Birthday from ${merchant.shop_name}!\n\nWishing you a wonderful day! 🎉\nVisit us today for a special birthday treat! 🎁`
+          composeBirthdayMessage(customer.name || '', merchant.shop_name)
         );
 
         await supabase.from('message_logs').insert({

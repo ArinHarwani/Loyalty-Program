@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { token, whatsapp_number, birth_month, birth_day } = validationResult.data;
+    const { token, whatsapp_number, name, birth_month, birth_day } = validationResult.data;
 
     const supabase = createServiceClient();
 
@@ -92,6 +92,7 @@ export async function POST(request: NextRequest) {
         .from('customers')
         .insert({
           whatsapp_number,
+          name: name || null,
           birth_month: birth_month || null,
           birth_day: birth_day || null,
         })
@@ -105,12 +106,18 @@ export async function POST(request: NextRequest) {
         );
       }
       customer = newCustomer;
-    } else if (birth_month && birth_day && (!customer.birth_month || !customer.birth_day)) {
-      // Update birthday if not set before
-      await supabase
-        .from('customers')
-        .update({ birth_month, birth_day })
-        .eq('id', customer.id);
+    } else {
+      // Update name if the customer gave one but doesn't have one saved yet
+      const updates: Record<string, unknown> = {};
+      if (name && !customer.name) updates.name = name;
+      if (birth_month && birth_day && (!customer.birth_month || !customer.birth_day)) {
+        updates.birth_month = birth_month;
+        updates.birth_day = birth_day;
+      }
+      if (Object.keys(updates).length > 0) {
+        await supabase.from('customers').update(updates).eq('id', customer.id);
+        customer = { ...customer, ...updates };
+      }
     }
 
     // 5. Find or create enrollment
@@ -185,8 +192,16 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const deadline = new Date();
-      deadline.setDate(deadline.getDate() + campaign.duration_days);
+      // Calculate deadline: use campaign end_date if set, else duration_days from now
+      let deadline: Date;
+      if (campaign.end_date) {
+        deadline = new Date(campaign.end_date);
+        // Set to end of day IST
+        deadline.setHours(23, 59, 59, 999);
+      } else {
+        deadline = new Date();
+        deadline.setDate(deadline.getDate() + campaign.duration_days);
+      }
 
       const { data: newEnrollment, error: enrollError } = await supabase
         .from('enrollments')

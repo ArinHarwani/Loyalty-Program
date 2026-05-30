@@ -23,9 +23,9 @@ export const CampaignSchema = z
     }),
     target_amount: z.number().optional(),
     target_visits: z.number().int().optional(),
-    duration_days: z.union([z.literal(15), z.literal(30), z.literal(45), z.literal(60)], {
-      required_error: 'Duration must be 15, 30, 45, or 60 days',
-    }),
+    // Either a preset duration OR a specific end date must be provided
+    duration_days: z.union([z.literal(15), z.literal(30), z.literal(45), z.literal(60)]).optional(),
+    end_date: z.string().date().optional(), // ISO date string: YYYY-MM-DD
     reward_description: z
       .string()
       .min(3, { message: 'Reward description must be at least 3 characters' })
@@ -33,6 +33,31 @@ export const CampaignSchema = z
       .trim(),
     max_winners: z.number().int().positive().nullable().optional(),
   })
+  .refine(
+    (data) => {
+      // Exactly one of duration_days or end_date must be provided
+      const hasDuration = typeof data.duration_days === 'number';
+      const hasEndDate = typeof data.end_date === 'string' && data.end_date.length > 0;
+      return hasDuration !== hasEndDate || (hasDuration && !hasEndDate) || (!hasDuration && hasEndDate);
+    },
+    {
+      message: 'Either a duration or a specific end date must be provided',
+      path: ['duration_days'],
+    }
+  )
+  .refine(
+    (data) => {
+      // If end_date is provided, it must be in the future
+      if (data.end_date) {
+        return new Date(data.end_date) > new Date();
+      }
+      return true;
+    },
+    {
+      message: 'Offer end date must be in the future',
+      path: ['end_date'],
+    }
+  )
   .refine(
     (data) => {
       if (data.campaign_type === 'amount') {
@@ -81,6 +106,7 @@ export const ScanRegisterSchema = z
     whatsapp_number: z
       .string({ required_error: 'WhatsApp number is required' })
       .regex(INDIAN_PHONE_REGEX, { message: 'Please enter a valid 10-digit Indian phone number' }),
+    name: z.string().max(60).trim().optional(),
     birth_month: z
       .number()
       .int()

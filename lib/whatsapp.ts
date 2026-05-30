@@ -65,8 +65,10 @@ export async function sendWhatsAppTemplate(
 }
 
 // --- Message Composers ---
+// customerName: pass customer's name, falls back to "there" if empty
 
 export function composeWelcomeMessage(
+  customerName: string,
   shopName: string,
   campaignDesc: string,
   reward: string,
@@ -77,7 +79,10 @@ export function composeWelcomeMessage(
   percentage: number,
   daysLeft: number
 ): string {
-  return `🎉 Welcome to ${shopName}'s loyalty program!
+  const greeting = customerName ? `Hi ${customerName}! 👋` : 'Hi there! 👋';
+  return `${greeting}
+
+🎉 Welcome to ${shopName}'s loyalty program!
 
 Goal: ${campaignDesc}
 Prize: ${reward}
@@ -89,6 +94,7 @@ ${daysLeft} days remaining 🛍️`;
 }
 
 export function composeWelcomeVisitMessage(
+  customerName: string,
   shopName: string,
   campaignDesc: string,
   reward: string,
@@ -98,7 +104,10 @@ export function composeWelcomeVisitMessage(
   percentage: number,
   daysLeft: number
 ): string {
-  return `🎉 Welcome to ${shopName}'s loyalty program!
+  const greeting = customerName ? `Hi ${customerName}! 👋` : 'Hi there! 👋';
+  return `${greeting}
+
+🎉 Welcome to ${shopName}'s loyalty program!
 
 Goal: ${campaignDesc}
 Prize: ${reward}
@@ -110,6 +119,7 @@ ${daysLeft} days remaining 🛍️`;
 }
 
 export function composeTransactionMessage(
+  customerName: string,
   shopName: string,
   amount: number,
   total: number,
@@ -117,7 +127,8 @@ export function composeTransactionMessage(
   daysLeft: number,
   percentage: number
 ): string {
-  return `${shopName} Loyalty Update 🎯
+  const greeting = customerName ? `Hi ${customerName}!` : 'Hey!';
+  return `${greeting} ${shopName} Loyalty Update 🎯
 
 ₹${amount} added!
 Total: ₹${total} / ₹${target}
@@ -125,13 +136,15 @@ ${daysLeft} days remaining • ${percentage}% complete`;
 }
 
 export function composeVisitMessage(
+  customerName: string,
   shopName: string,
   totalVisits: number,
   targetVisits: number,
   daysLeft: number,
   percentage: number
 ): string {
-  return `${shopName} Loyalty Update 🎯
+  const greeting = customerName ? `Hi ${customerName}!` : 'Hey!';
+  return `${greeting} ${shopName} Loyalty Update 🎯
 
 Visit logged!
 Total: ${totalVisits} / ${targetVisits} visits
@@ -139,22 +152,35 @@ ${daysLeft} days remaining • ${percentage}% complete`;
 }
 
 export function composeCompletionMessage(
+  customerName: string,
   shopName: string,
   reward: string,
   claimCode: string
 ): string {
-  return `🎉 GOAL COMPLETED at ${shopName}!
+  const greeting = customerName ? `Congratulations ${customerName}! 🎉` : 'Congratulations! 🎉';
+  return `${greeting}
+
+🏆 GOAL COMPLETED at ${shopName}!
 
 Prize: ${reward}
 Claim Code: ${claimCode}
 
-Show this code to the shop to claim your reward!`;
+Show this code to the shop to claim your reward! 🎁`;
 }
 
-export function composeHelpMessage(): string {
-  return `Welcome to LoyaltyQR! 🎯
+export function composeBirthdayMessage(
+  customerName: string,
+  shopName: string
+): string {
+  const name = customerName || 'Friend';
+  return `🎂 Happy Birthday, ${name}! 🎉
 
-To join a loyalty program, scan the QR code at any participating shop.
+We at ${shopName} wish you a wonderful birthday filled with joy, laughter, and all your favourite things! 🥳
 
-Need help? Contact the shop directly.`;
+You're a very special customer to us and we hope today is as amazing as you are. 🌟
+
+Come visit us soon — we'd love to celebrate with you! 🎁
+
+With lots of love,
+Team ${shopName} 💚`;
 }

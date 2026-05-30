@@ -259,6 +259,7 @@ export async function processTransaction(
   const percentage = calcPercentage(current, target);
   const daysLeft = daysRemaining(enrollment.deadline_at);
   const isFirstTransaction = !isReturnTxn && newTotalVisits === 1;
+  const customerName = customer.name || '';
 
   // Return transactions get a specific reply
   if (isReturnTxn) {
@@ -291,17 +292,17 @@ export async function processTransaction(
   let replyText: string;
 
   if (isCompleted) {
-    replyText = composeCompletionMessage(merchant.shop_name, campaign.reward_description, claimCode!);
+    replyText = composeCompletionMessage(customerName, merchant.shop_name, campaign.reward_description, claimCode!);
   } else if (isFirstTransaction) {
     if (campaign.campaign_type === 'amount') {
       replyText = composeWelcomeMessage(
-        merchant.shop_name, campaignDesc, campaign.reward_description,
+        customerName, merchant.shop_name, campaignDesc, campaign.reward_description,
         formatDate(enrollment.deadline_at), qrToken.amount,
         newTotalSpent, campaign.target_amount || 0, percentage, daysLeft
       );
     } else {
       replyText = composeWelcomeVisitMessage(
-        merchant.shop_name, campaignDesc, campaign.reward_description,
+        customerName, merchant.shop_name, campaignDesc, campaign.reward_description,
         formatDate(enrollment.deadline_at), newTotalVisits,
         campaign.target_visits || 0, percentage, daysLeft
       );
@@ -309,12 +310,12 @@ export async function processTransaction(
   } else {
     if (campaign.campaign_type === 'amount') {
       replyText = composeTransactionMessage(
-        merchant.shop_name, qrToken.amount, newTotalSpent,
+        customerName, merchant.shop_name, qrToken.amount, newTotalSpent,
         campaign.target_amount || 0, daysLeft, percentage
       );
     } else {
       replyText = composeVisitMessage(
-        merchant.shop_name, newTotalVisits,
+        customerName, merchant.shop_name, newTotalVisits,
         campaign.target_visits || 0, daysLeft, percentage
       );
     }

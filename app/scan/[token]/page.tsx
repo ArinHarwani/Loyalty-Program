@@ -20,6 +20,7 @@ export default function ScanPage() {
 
   // Customer form
   const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [customerName, setCustomerName] = useState('');
   const [birthMonth, setBirthMonth] = useState('');
   const [birthDay, setBirthDay] = useState('');
   const [isReturning, setIsReturning] = useState(false);
@@ -104,6 +105,7 @@ export default function ScanPage() {
         body: JSON.stringify({
           token,
           whatsapp_number: whatsappNumber,
+          name: customerName.trim() || undefined,
           birth_month: birthMonth ? Number(birthMonth) : undefined,
           birth_day: birthDay ? Number(birthDay) : undefined,
         }),
@@ -314,39 +316,57 @@ export default function ScanPage() {
                 </div>
               )}
 
-              {/* Birthday fields (hidden for returning customers) */}
+              {/* New customer fields: name + birthday */}
               {!isReturning && (
-                <div className="card" style={{ marginBottom: '1.5rem' }}>
-                  <label className="label">Birthday (optional — for birthday rewards!)</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                    <select
-                      className="select"
-                      value={birthMonth}
-                      onChange={(e) => setBirthMonth(e.target.value)}
-                    >
-                      <option value="">Month</option>
-                      {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map(
-                        (m, i) => (
-                          <option key={m} value={i + 1}>
-                            {m}
-                          </option>
-                        )
-                      )}
-                    </select>
-                    <select
-                      className="select"
-                      value={birthDay}
-                      onChange={(e) => setBirthDay(e.target.value)}
-                    >
-                      <option value="">Day</option>
-                      {Array.from({ length: 31 }, (_, i) => (
-                        <option key={i + 1} value={i + 1}>
-                          {i + 1}
-                        </option>
-                      ))}
-                    </select>
+                <>
+                  <div className="card" style={{ marginBottom: '1rem' }}>
+                    <label className="label">Your Name (optional — for personalised messages!)</label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="e.g. Rahul"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      maxLength={60}
+                      id="name-input"
+                    />
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
+                      We&apos;ll use this to personalise your loyalty messages 😊
+                    </p>
                   </div>
-                </div>
+
+                  <div className="card" style={{ marginBottom: '1.5rem' }}>
+                    <label className="label">Birthday (optional — for birthday rewards!)</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                      <select
+                        className="select"
+                        value={birthMonth}
+                        onChange={(e) => setBirthMonth(e.target.value)}
+                      >
+                        <option value="">Month</option>
+                        {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map(
+                          (m, i) => (
+                            <option key={m} value={i + 1}>
+                              {m}
+                            </option>
+                          )
+                        )}
+                      </select>
+                      <select
+                        className="select"
+                        value={birthDay}
+                        onChange={(e) => setBirthDay(e.target.value)}
+                      >
+                        <option value="">Day</option>
+                        {Array.from({ length: 31 }, (_, i) => (
+                          <option key={i + 1} value={i + 1}>
+                            {i + 1}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </>
               )}
 
               <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', textAlign: 'center', marginBottom: '1.25rem', lineHeight: '1.4' }}>

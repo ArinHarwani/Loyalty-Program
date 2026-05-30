@@ -29,6 +29,7 @@ export interface Campaign {
   target_amount: number | null;
   target_visits: number | null;
   duration_days: number;
+  end_date: string | null;
   reward_description: string;
   max_winners: number | null;
   status: 'active' | 'ended';
@@ -38,6 +39,7 @@ export interface Campaign {
 export interface Customer {
   id: string;
   whatsapp_number: string;
+  name: string | null;
   birth_month: number | null;
   birth_day: number | null;
   created_at: string;
@@ -128,7 +130,8 @@ export interface CreateCampaignRequest {
   campaign_type: 'amount' | 'visits';
   target_amount?: number;
   target_visits?: number;
-  duration_days: 15 | 30 | 45 | 60;
+  duration_days?: 15 | 30 | 45 | 60;
+  end_date?: string;
   reward_description: string;
   max_winners?: number;
 }
@@ -147,6 +150,7 @@ export interface TransactionStatusResponse {
 export interface ScanRequest {
   token: string;
   whatsapp_number: string;
+  name?: string;
   birth_month?: number;
   birth_day?: number;
 }

@@ -7,6 +7,8 @@ import { formatCurrency } from '@/lib/utils';
 import Link from 'next/link';
 import type { Merchant } from '@/types';
 
+type DurationMode = 'preset' | 'specific';
+
 export default function NewCampaignPage() {
   const router = useRouter();
   const [merchant, setMerchant] = useState<Merchant | null>(null);
@@ -18,9 +20,32 @@ export default function NewCampaignPage() {
   const [campaignType, setCampaignType] = useState<'amount' | 'visits'>('amount');
   const [targetAmount, setTargetAmount] = useState('');
   const [targetVisits, setTargetVisits] = useState('');
+  const [durationMode, setDurationMode] = useState<DurationMode>('preset');
   const [durationDays, setDurationDays] = useState<number>(30);
+  const [endDate, setEndDate] = useState('');
   const [rewardDescription, setRewardDescription] = useState('');
   const [maxWinners, setMaxWinners] = useState('');
+
+  // Compute min date for the date picker (tomorrow)
+  const minDate = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+  })();
+
+  // Calculate how many days the specific end date represents (for preview)
+  const computedDurationDays = durationMode === 'specific' && endDate
+    ? Math.ceil((new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : durationDays;
+
+  // Format end date for preview display
+  const previewEndDate = durationMode === 'specific' && endDate
+    ? new Date(endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+    : (() => {
+        const d = new Date();
+        d.setDate(d.getDate() + durationDays);
+        return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+      })();
 
   useEffect(() => {
     const supabase = createClient();
@@ -43,21 +68,42 @@ export default function NewCampaignPage() {
     e.preventDefault();
     if (!merchant) return;
 
+    // Validate end date mode
+    if (durationMode === 'specific') {
+      if (!endDate) {
+        setError('Please select an offer end date.');
+        return;
+      }
+      if (new Date(endDate) <= new Date()) {
+        setError('Offer end date must be in the future.');
+        return;
+      }
+    }
+
     setLoading(true);
     setError('');
 
     try {
       const supabase = createClient();
-      const { error: insertError } = await supabase.from('campaigns').insert({
+      const payload: Record<string, unknown> = {
         merchant_id: merchant.id,
         name,
         campaign_type: campaignType,
         target_amount: campaignType === 'amount' ? Number(targetAmount) : null,
         target_visits: campaignType === 'visits' ? Number(targetVisits) : null,
-        duration_days: durationDays,
         reward_description: rewardDescription,
         max_winners: maxWinners ? Number(maxWinners) : null,
-      });
+      };
+
+      if (durationMode === 'preset') {
+        payload.duration_days = durationDays;
+      } else {
+        payload.end_date = endDate;
+        // Also store computed duration_days for display purposes
+        payload.duration_days = Math.max(1, computedDurationDays);
+      }
+
+      const { error: insertError } = await supabase.from('campaigns').insert(payload);
 
       if (insertError) {
         setError(insertError.message);
@@ -149,22 +195,78 @@ export default function NewCampaignPage() {
             )}
           </div>
 
-          {/* Duration */}
+          {/* Offer Duration */}
           <div className="card" style={{ marginBottom: '1rem' }}>
-            <label className="label">Duration</label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
-              {[15, 30, 45, 60].map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  className={`btn ${durationDays === d ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => setDurationDays(d)}
-                  style={{ padding: '0.75rem' }}
-                >
-                  {d} days
-                </button>
-              ))}
+            <label className="label">Offer Duration</label>
+
+            {/* Mode switcher */}
+            <div className="toggle-group" style={{ marginBottom: '1rem' }}>
+              <button
+                type="button"
+                className={`toggle-btn ${durationMode === 'preset' ? 'active' : ''}`}
+                onClick={() => setDurationMode('preset')}
+                id="duration-preset-btn"
+              >
+                ⏱ Quick Select
+              </button>
+              <button
+                type="button"
+                className={`toggle-btn ${durationMode === 'specific' ? 'active' : ''}`}
+                onClick={() => setDurationMode('specific')}
+                id="duration-date-btn"
+              >
+                📅 Pick End Date
+              </button>
             </div>
+
+            {durationMode === 'preset' && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+                {[15, 30, 45, 60].map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    className={`btn ${durationDays === d ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setDurationDays(d)}
+                    style={{ padding: '0.75rem' }}
+                  >
+                    {d} days
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {durationMode === 'specific' && (
+              <div>
+                <input
+                  type="date"
+                  className="input"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  min={minDate}
+                  required={durationMode === 'specific'}
+                  id="end-date-input"
+                  style={{ cursor: 'pointer' }}
+                />
+                {endDate && computedDurationDays > 0 && (
+                  <p style={{
+                    color: 'var(--primary)',
+                    fontSize: '0.85rem',
+                    marginTop: '0.5rem',
+                    fontWeight: 600,
+                  }}>
+                    ✓ Offer runs for {computedDurationDays} day{computedDurationDays !== 1 ? 's' : ''} — ends {previewEndDate}
+                  </p>
+                )}
+                {endDate && computedDurationDays <= 0 && (
+                  <p style={{ color: '#dc2626', fontSize: '0.85rem', marginTop: '0.5rem' }}>
+                    ⚠️ End date must be in the future
+                  </p>
+                )}
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
+                  All customers enrolling in this campaign will have until this date to complete the offer
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Reward */}
@@ -209,8 +311,11 @@ export default function NewCampaignPage() {
             </h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
               {campaignType === 'amount'
-                ? `Spend ${targetAmount ? formatCurrency(Number(targetAmount)) : '₹___'} in ${durationDays} days`
-                : `Visit ${targetVisits || '___'} times in ${durationDays} days`}
+                ? `Spend ${targetAmount ? formatCurrency(Number(targetAmount)) : '₹___'} in ${computedDurationDays} days`
+                : `Visit ${targetVisits || '___'} times in ${computedDurationDays} days`}
+            </p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+              📅 Offer ends: <strong>{previewEndDate}</strong>
             </p>
             <p style={{ fontSize: '0.9rem' }}>
               🎁 {rewardDescription || 'Reward description'}
@@ -231,7 +336,13 @@ export default function NewCampaignPage() {
           <button
             type="submit"
             className="btn btn-primary btn-full btn-lg"
-            disabled={loading || !name || !rewardDescription || (campaignType === 'amount' ? !targetAmount : !targetVisits)}
+            disabled={
+              loading ||
+              !name ||
+              !rewardDescription ||
+              (campaignType === 'amount' ? !targetAmount : !targetVisits) ||
+              (durationMode === 'specific' && (!endDate || computedDurationDays <= 0))
+            }
             id="create-campaign-btn"
           >
             {loading ? (
