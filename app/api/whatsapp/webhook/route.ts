@@ -12,7 +12,6 @@ import {
   composeTransactionMessage,
   composeVisitMessage,
   composeCompletionMessage,
-  composeHelpMessage,
 } from '@/lib/whatsapp';
 import { processJoin, processTransaction } from '@/lib/scan-logic';
 import crypto from 'crypto';
@@ -98,7 +97,7 @@ export async function POST(request: NextRequest) {
     }
     // ===================== DEFAULT HELP =====================
     else {
-      await sendWhatsAppMessage(senderNumber, composeHelpMessage());
+      await sendWhatsAppMessage(senderNumber, 'Hello! Please scan a shop QR code to join their loyalty program or check your progress. 😊');
     }
 
     return NextResponse.json({ status: 'ok' }, { status: 200 });
