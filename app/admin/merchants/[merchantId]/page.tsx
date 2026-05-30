@@ -65,6 +65,12 @@ export default function MerchantDetailPage() {
     }
   };
 
+  useEffect(() => {
+    if (merchantId) {
+      loadData();
+    }
+  }, [merchantId]);
+
   const handlePlanChange = (plan: string) => {
     setPlanName(plan);
     if (plan === 'starter') setPrice('999');
