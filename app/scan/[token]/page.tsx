@@ -31,6 +31,13 @@ export default function ScanPage() {
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const autoSubmitRef = useRef(false);
 
+  // QR expiry countdown (3 minutes = 180 seconds)
+  const [qrSecondsLeft, setQrSecondsLeft] = useState(180);
+  const qrTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Stored WhatsApp URL from API
+  const [whatsappUrl, setWhatsappUrl] = useState('');
+
   const validateToken = async () => {
     try {
       const response = await fetch(`/api/scan/validate?token=${token}`);
@@ -63,11 +70,31 @@ export default function ScanPage() {
       }
 
       setState('form');
+
+      // Start QR expiry countdown (3 minutes)
+      qrTimerRef.current = setInterval(() => {
+        setQrSecondsLeft(prev => {
+          if (prev <= 1) {
+            if (qrTimerRef.current) clearInterval(qrTimerRef.current);
+            setState('error');
+            setErrorMsg('QR code has expired. Ask the shopkeeper to generate a new one.');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     } catch {
       setErrorMsg('Something went wrong. Please try again.');
       setState('error');
     }
   };
+
+  // Cleanup QR timer on unmount
+  useEffect(() => {
+    return () => {
+      if (qrTimerRef.current) clearInterval(qrTimerRef.current);
+    };
+  }, []);
 
   // Validate token on mount
   useEffect(() => {
@@ -114,6 +141,9 @@ export default function ScanPage() {
       const data = await response.json();
 
       if (data.success) {
+        // Stop QR countdown — no longer needed once registered
+        if (qrTimerRef.current) clearInterval(qrTimerRef.current);
+
         // Save to localStorage (per-merchant)
         try {
           localStorage.setItem(`wnum_${data.merchant_id}`, whatsappNumber);
@@ -121,13 +151,14 @@ export default function ScanPage() {
           console.warn('localStorage is not available', e);
         }
 
+        // Use the URL returned from the server (it knows the business number)
+        const waUrl = data.whatsapp_url || `https://wa.me/?text=TXN-${token}`;
+        setWhatsappUrl(waUrl);
+
         // Switch to redirecting state
         setState('redirecting');
 
         // Redirect to WhatsApp after a brief delay
-        const rawNumber = process.env.NEXT_PUBLIC_WHATSAPP_BUSINESS_NUMBER || '';
-        const businessNumber = rawNumber.replace(/\D/g, ''); // Strip +, spaces, parentheses
-        const waUrl = `https://wa.me/${businessNumber}?text=TXN-${token}`;
         setTimeout(() => {
           window.location.href = waUrl;
         }, 800);
@@ -224,6 +255,34 @@ export default function ScanPage() {
                 </p>
               </div>
             </div>
+
+            {/* QR Countdown Timer */}
+            {qrSecondsLeft > 0 && qrSecondsLeft <= 180 && (
+              <div style={{
+                textAlign: 'center',
+                marginBottom: '1rem',
+                padding: '0.6rem 1rem',
+                borderRadius: 'var(--radius-md)',
+                background: qrSecondsLeft <= 30
+                  ? 'rgba(239, 68, 68, 0.1)'
+                  : qrSecondsLeft <= 60
+                  ? 'rgba(234, 179, 8, 0.1)'
+                  : 'rgba(16, 185, 129, 0.08)',
+                border: `1px solid ${
+                  qrSecondsLeft <= 30 ? 'rgba(239,68,68,0.3)'
+                  : qrSecondsLeft <= 60 ? 'rgba(234,179,8,0.3)'
+                  : 'rgba(16,185,129,0.2)'
+                }`,
+              }}>
+                <span style={{
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  color: qrSecondsLeft <= 30 ? 'var(--danger)' : qrSecondsLeft <= 60 ? 'var(--warning)' : 'var(--primary)',
+                }}>
+                  ⏱ QR expires in {Math.floor(qrSecondsLeft / 60)}:{String(qrSecondsLeft % 60).padStart(2, '0')}
+                </span>
+              </div>
+            )}
 
             {/* Transaction amount banner */}
             <div
@@ -435,7 +494,7 @@ export default function ScanPage() {
             <div className="spinner" style={{ width: 30, height: 30, margin: '0 auto 1.5rem' }} />
 
             <a
-              href={`https://wa.me/${(process.env.NEXT_PUBLIC_WHATSAPP_BUSINESS_NUMBER || '').replace(/\D/g, '')}?text=TXN-${token}`}
+              href={whatsappUrl || `https://wa.me/?text=TXN-${token}`}
               className="btn btn-whatsapp btn-full btn-lg"
               style={{ textDecoration: 'none', marginBottom: '1rem' }}
             >

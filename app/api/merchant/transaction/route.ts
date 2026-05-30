@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     }
 
     const token = generateQrToken();
-    const expiresAt = new Date(Date.now() + 60 * 1000).toISOString();
+    const expiresAt = new Date(Date.now() + 3 * 60 * 1000).toISOString(); // 3 minutes
 
     const { error: insertError } = await supabase.from('qr_tokens').insert({
       token,

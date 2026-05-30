@@ -227,9 +227,17 @@ export async function POST(request: NextRequest) {
     }
 
     // 6. Return success
+    const businessNumber = (process.env.WHATSAPP_BUSINESS_NUMBER || '').replace(/\D/g, '');
+    // Build WhatsApp deep link — include country code 91 for India if not already present
+    const waNumber = businessNumber.startsWith('91') ? businessNumber : `91${businessNumber}`;
+    const whatsappUrl = businessNumber
+      ? `https://wa.me/${waNumber}?text=TXN-${token}`
+      : null;
+
     return NextResponse.json({
       success: true,
       merchant_id: merchant.id,
+      whatsapp_url: whatsappUrl,
       is_new_customer: isNewCustomer,
       is_new_enrollment: isNewEnrollment,
       campaign: {
