@@ -5,14 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase';
-import {
-  sendWhatsAppMessage,
-  composeWelcomeMessage,
-  composeWelcomeVisitMessage,
-  composeTransactionMessage,
-  composeVisitMessage,
-  composeCompletionMessage,
-} from '@/lib/whatsapp';
+import { sendWhatsAppMessage } from '@/lib/whatsapp';
 import { processJoin, processTransaction } from '@/lib/scan-logic';
 import crypto from 'crypto';
 
@@ -88,7 +81,9 @@ export async function POST(request: NextRequest) {
     }
     // ===================== TXN FLOW =====================
     else if (messageText.toUpperCase().startsWith('TXN-')) {
-      const txnToken = messageText.toUpperCase().split('TXN-')[1]?.trim();
+      // IMPORTANT: preserve original case of the token!
+      // Tokens are lowercase (base36). toUpperCase() would break the DB lookup.
+      const txnToken = messageText.substring(4).trim();
       if (!txnToken) {
         await sendWhatsAppMessage(senderNumber, 'Invalid transaction code.');
         return NextResponse.json({ status: 'ok' }, { status: 200 });
