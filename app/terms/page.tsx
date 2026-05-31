@@ -77,7 +77,7 @@ export default function TermsOfUse() {
                   fontSize: '0.95rem'
                 }}
               >
-                ⚠️ WE DO NOT TAKE ANY LIABILITY OF DATA LEAKAGE, DATA BREACH OR UNAUTHORISED ACTIVITY.
+                ⚠️ We do not take any liability of data leakage, data breach or unauthorised activity.
               </div>
               <p style={{ color: 'var(--text-secondary)', marginTop: '0.75rem' }}>
                 The Platform is provided on an &apos;AS IS&apos; and &apos;AS AVAILABLE&apos; basis. LoyaltyQR, its creators, and operators shall not be held liable for any direct, indirect, incidental, special, or consequential damages resulting from the use or inability to use the Platform, including but not limited to data leakage, server downtime, system hacks, database compromises, or unauthorized modifications to loyalty counts or client records.
@@ -107,7 +107,8 @@ export default function TermsOfUse() {
             {/* Section 6 */}
             <section style={{ borderTop: '1px solid var(--border)', paddingTop: '1.5rem', marginTop: '1rem' }}>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center' }}>
-                If you have any questions regarding these Terms, please contact support or your hosting Merchant.
+                If you have any questions regarding these Terms, please contact support or your hosting Merchant.<br /><br />
+                Contact: loyalltyqr@gmail.com
               </p>
             </section>
 

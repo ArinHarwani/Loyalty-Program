@@ -96,7 +96,8 @@ export default function PrivacyPolicy() {
             {/* Section 5 */}
             <section style={{ borderTop: '1px solid var(--border)', paddingTop: '1.5rem', marginTop: '1rem' }}>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center' }}>
-                For further clarification regarding your personal data, please contact the specific Merchant shop or our team.
+                For further clarification regarding your personal data, please contact the specific Merchant shop or our team.<br /><br />
+                Contact: loyalltyqr@gmail.com
               </p>
             </section>
 
