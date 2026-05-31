@@ -46,6 +46,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { enrollment_id } = body;
 
+    // Validate enrollment_id is a valid UUID
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!enrollment_id || typeof enrollment_id !== 'string' || !uuidRegex.test(enrollment_id)) {
+      return NextResponse.json({ error: 'Invalid enrollment ID' }, { status: 400 });
+    }
+
     const { error: updateError } = await supabase
       .from('enrollments')
       .update({ claimed: true })

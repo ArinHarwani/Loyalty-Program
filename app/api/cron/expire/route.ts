@@ -55,8 +55,12 @@ export async function GET(request: NextRequest) {
           ? `₹${enrollment.total_spent}`
           : `${enrollment.total_visits} visits`;
 
+        const waNumber = enrollment.customer.whatsapp_number.startsWith('91')
+          ? enrollment.customer.whatsapp_number
+          : `91${enrollment.customer.whatsapp_number}`;
+
         await sendWhatsAppMessage(
-          enrollment.customer.whatsapp_number,
+          waNumber,
           `⚠️ Your loyalty goal at ${enrollment.merchant.shop_name} expires soon!\n\nProgress: ${current} / ${target}\n🎁 Prize: ${enrollment.campaign.reward_description}\n\nVisit the shop before it's too late!`
         );
 

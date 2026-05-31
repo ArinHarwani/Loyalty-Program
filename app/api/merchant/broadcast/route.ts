@@ -79,8 +79,16 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (!message) {
+    if (!message || typeof message !== 'string') {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
+    }
+
+    const trimmedMessage = message.trim();
+    if (trimmedMessage.length === 0 || trimmedMessage.length > 1000) {
+      return NextResponse.json(
+        { error: 'Message must be between 1 and 1000 characters' },
+        { status: 400 }
+      );
     }
 
     // Send to all unique customers
@@ -90,7 +98,7 @@ export async function POST(request: NextRequest) {
     for (const [, customer] of uniqueCustomers) {
       await sendWhatsAppMessage(
         customer.whatsapp_number,
-        `${merchant.shop_name} 📢\n\n${message}`
+        `${merchant.shop_name} 📢\n\n${trimmedMessage}`
       );
 
       await supabase.from('message_logs').insert({

@@ -2,6 +2,8 @@
 // LoyaltyQR — Utility Functions
 // ============================================================
 
+import crypto from 'crypto';
+
 /**
  * Format a number as Indian Rupees (₹1,234.00)
  */
@@ -26,10 +28,11 @@ export function maskPhone(phone: string): string {
  * Generate a claim code like #WIN-A3F7
  */
 export function generateClaimCode(): string {
+  const bytes = crypto.randomBytes(4);
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let code = '';
-  for (let i = 0; i < 4; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(bytes[i % 4] % chars.length);
   }
   return `#WIN-${code}`;
 }
@@ -76,9 +79,7 @@ export function generateMerchantCode(shopName: string): string {
  * Generate a unique QR token
  */
 export function generateQrToken(): string {
-  const timestamp = Date.now().toString(36);
-  const random = Math.random().toString(36).substring(2, 10);
-  return `${timestamp}-${random}`;
+  return crypto.randomUUID();
 }
 
 /**

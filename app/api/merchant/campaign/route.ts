@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     if (!validationResult.success) {
       return NextResponse.json(
-        { error: validationResult.error.errors[0]?.message || 'Invalid campaign data' },
+        { error: validationResult.error.issues[0]?.message || 'Invalid campaign data' },
         { status: 400 }
       );
     }

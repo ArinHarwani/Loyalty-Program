@@ -46,8 +46,11 @@ export async function GET(request: NextRequest) {
 
       // Send birthday wish from each merchant
       for (const [, merchant] of merchants) {
+        const waNumber = customer.whatsapp_number.startsWith('91')
+          ? customer.whatsapp_number
+          : `91${customer.whatsapp_number}`;
         await sendWhatsAppMessage(
-          customer.whatsapp_number,
+          waNumber,
           composeBirthdayMessage(customer.name || '', merchant.shop_name)
         );
 

@@ -19,7 +19,7 @@ export const CampaignSchema = z
       .max(100, { message: 'Campaign name cannot exceed 100 characters' })
       .trim(),
     campaign_type: z.enum(['amount', 'visits'], {
-      required_error: 'Campaign type is required',
+      message: 'Campaign type is required',
     }),
     target_amount: z.number().optional(),
     target_visits: z.number().int().optional(),
@@ -88,10 +88,10 @@ export const CampaignSchema = z
  */
 export const TransactionSchema = z.object({
   amount: z
-    .number({ required_error: 'Amount is required' })
+    .number({ message: 'Amount is required' })
     .min(0, { message: 'Transaction amount cannot be negative' }),
   campaign_id: z
-    .string({ required_error: 'Campaign ID is required' })
+    .string({ message: 'Campaign ID is required' })
     .uuid({ message: 'Invalid Campaign ID format' }),
 });
 
@@ -101,10 +101,10 @@ export const TransactionSchema = z.object({
 export const ScanRegisterSchema = z
   .object({
     token: z
-      .string({ required_error: 'QR token is required' })
+      .string({ message: 'QR token is required' })
       .min(1, { message: 'QR token cannot be empty' }),
     whatsapp_number: z
-      .string({ required_error: 'WhatsApp number is required' })
+      .string({ message: 'WhatsApp number is required' })
       .regex(INDIAN_PHONE_REGEX, { message: 'Please enter a valid 10-digit Indian phone number' }),
     name: z.string().max(60).trim().optional(),
     birth_month: z

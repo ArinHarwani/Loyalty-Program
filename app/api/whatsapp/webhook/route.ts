@@ -26,11 +26,16 @@ export async function GET(request: NextRequest) {
 // POST — Incoming messages
 export async function POST(request: NextRequest) {
   try {
-    // Verify signature
+    // Verify signature — MANDATORY when WHATSAPP_APP_SECRET is configured
     const body = await request.text();
     const signature = request.headers.get('x-hub-signature-256');
 
-    if (signature && process.env.WHATSAPP_APP_SECRET) {
+    if (process.env.WHATSAPP_APP_SECRET) {
+      if (!signature) {
+        console.error('Webhook rejected: missing x-hub-signature-256 header');
+        return NextResponse.json({ error: 'Missing signature' }, { status: 401 });
+      }
+
       const expectedSig =
         'sha256=' +
         crypto
@@ -38,7 +43,11 @@ export async function POST(request: NextRequest) {
           .update(body)
           .digest('hex');
 
-      if (signature !== expectedSig) {
+      if (
+        signature.length !== expectedSig.length ||
+        !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig))
+      ) {
+        console.error('Webhook rejected: invalid signature');
         return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
       }
     }
