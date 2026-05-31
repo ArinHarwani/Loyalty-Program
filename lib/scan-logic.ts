@@ -261,15 +261,10 @@ export async function processTransaction(
   const isFirstTransaction = !isReturnTxn && newTotalVisits === 1;
   const customerName = customer.name || '';
 
-  // Return transactions get a specific reply
   if (isReturnTxn) {
     const returnAmount = Math.abs(Number(qrToken.amount));
     const returnReply = `${merchant.shop_name} — Return Processed ↩\n\n−₹${returnAmount} adjusted from your total.\nUpdated total: ₹${newTotalSpent} / ₹${target}\n${daysLeft} days remaining`;
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
-    const fullReturnReply = appUrl
-      ? returnReply + `\n\nView progress: ${appUrl}/progress/${merchant.id}/${customerNumber}`
-      : returnReply;
-    await sendWhatsAppMessage(senderNumber, fullReturnReply);
+    await sendWhatsAppMessage(senderNumber, returnReply);
     await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken);
     await supabase.from('message_logs').insert({
       merchant_id: merchant.id,
@@ -319,12 +314,6 @@ export async function processTransaction(
         campaign.target_visits || 0, daysLeft, percentage
       );
     }
-  }
-
-  // Add progress URL
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
-  if (appUrl) {
-    replyText += `\n\nView progress: ${appUrl}/progress/${merchant.id}/${customerNumber}`;
   }
 
   // 10. Send reply

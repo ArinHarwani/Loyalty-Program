@@ -19,7 +19,7 @@ export default function TransactionPage() {
   const [mode, setMode] = useState<TxnMode>('purchase');
   const [state, setState] = useState<PageState>('input');
   const [qrDataUrl, setQrDataUrl] = useState('');
-  const [countdown, setCountdown] = useState(60);
+  const [countdown, setCountdown] = useState(180);
   const [loading, setLoading] = useState(false);
   const [scannedCustomer, setScannedCustomer] = useState('');
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
@@ -69,7 +69,7 @@ export default function TransactionPage() {
     try {
       const supabase = createClient();
       const newToken = generateQrToken();
-      const expiresAt = new Date(Date.now() + 60 * 1000).toISOString();
+      const expiresAt = new Date(Date.now() + 180 * 1000).toISOString();
 
       // Store negative amount for returns
       const storedAmount = isReturn
@@ -101,7 +101,7 @@ export default function TransactionPage() {
       });
 
       setQrDataUrl(dataUrl);
-      setCountdown(60);
+      setCountdown(180);
       setState('qr');
 
       countdownRef.current = setInterval(() => {
@@ -153,13 +153,13 @@ export default function TransactionPage() {
     setAmount('');
     setState('input');
     setQrDataUrl('');
-    setCountdown(60);
+    setCountdown(180);
     setScannedCustomer('');
     setMode('purchase');
   }, []);
 
   const circumference = 2 * Math.PI * 36;
-  const offset = circumference - (countdown / 60) * circumference;
+  const offset = circumference - (countdown / 180) * circumference;
 
   if (!campaign) {
     return (

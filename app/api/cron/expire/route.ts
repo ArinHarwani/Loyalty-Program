@@ -33,22 +33,6 @@ export async function GET(request: NextRequest) {
         .update({ status: 'expired' })
         .eq('id', enrollment.id);
 
-      // Send expiry notification
-      if (enrollment.customer && enrollment.merchant) {
-        await sendWhatsAppMessage(
-          enrollment.customer.whatsapp_number,
-          `⏰ Your loyalty enrollment at ${enrollment.merchant.shop_name} has expired.\n\nScan the QR at your next visit to start fresh!`
-        );
-
-        await supabase.from('message_logs').insert({
-          merchant_id: enrollment.merchant_id,
-          customer_id: enrollment.customer_id,
-          template_name: 'loyalty_expired',
-          category: 'utility',
-          cost: 0.11,
-          status: 'sent',
-        });
-      }
       expired++;
     }
 
