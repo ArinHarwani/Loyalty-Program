@@ -68,17 +68,36 @@ export async function middleware(request: NextRequest) {
   // https://supabase.com/docs/guides/auth/server-side/nextjs
   const { data: { user } } = await supabase.auth.getUser();
 
+  // Helper to preserve refreshed cookies on redirect
+  const redirect = (path: string) => {
+    const redirectResponse = NextResponse.redirect(new URL(path, request.url));
+    response.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value);
+    });
+    return redirectResponse;
+  };
+
   const { pathname } = request.nextUrl;
+
+  // If user is already logged in and visits login or signup, send them to dashboard
+  if (pathname === '/merchant/login' || pathname === '/merchant/signup') {
+    if (user) {
+      if (user.email === process.env.ADMIN_EMAIL) {
+        return redirect('/admin');
+      }
+      return redirect('/merchant/dashboard');
+    }
+  }
 
   // Protect /merchant routes (except /merchant/login and /merchant/signup)
   if (pathname.startsWith('/merchant') && !pathname.startsWith('/merchant/login') && !pathname.startsWith('/merchant/signup')) {
     if (!user) {
-      return NextResponse.redirect(new URL('/merchant/login', request.url));
+      return redirect('/merchant/login');
     }
 
     // If the logged in user is the admin and they land on dashboard/onboarding, route them to /admin
     if (user.email === process.env.ADMIN_EMAIL && (pathname === '/merchant/dashboard' || pathname === '/merchant/onboarding')) {
-      return NextResponse.redirect(new URL('/admin', request.url));
+      return redirect('/admin');
     }
 
     // Check subscription status
@@ -103,17 +122,17 @@ export async function middleware(request: NextRequest) {
       // Hard block — cannot access anything
       if (merchant.subscription_status === 'blocked') {
         if (!pathname.startsWith('/merchant/suspended')) {
-          return NextResponse.redirect(new URL('/merchant/suspended', request.url));
+          return redirect('/merchant/suspended');
         }
       } else if (merchant.subscription_status === 'inactive') {
         // Not yet activated — send to pending page
         if (!pathname.startsWith('/merchant/pending')) {
-          return NextResponse.redirect(new URL('/merchant/pending', request.url));
+          return redirect('/merchant/pending');
         }
       } else {
         // Active - restrict access to pending/suspended pages
         if (pathname.startsWith('/merchant/pending') || pathname.startsWith('/merchant/suspended')) {
-          return NextResponse.redirect(new URL('/merchant/dashboard', request.url));
+          return redirect('/merchant/dashboard');
         }
       }
     }
@@ -122,7 +141,7 @@ export async function middleware(request: NextRequest) {
   // Protect /admin routes
   if (pathname.startsWith('/admin')) {
     if (!user || user.email !== process.env.ADMIN_EMAIL) {
-      return NextResponse.redirect(new URL('/merchant/login', request.url));
+      return redirect('/merchant/login');
     }
   }
 
