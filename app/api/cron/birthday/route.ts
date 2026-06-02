@@ -51,9 +51,18 @@ export async function GET(request: NextRequest) {
         const waNumber = customer.whatsapp_number.startsWith('91')
           ? customer.whatsapp_number
           : `91${customer.whatsapp_number}`;
-        await sendWhatsAppMessage(
+        await sendWhatsAppTemplate(
           waNumber,
-          composeBirthdayMessage(customer.name || '', merchant.shop_name)
+          'birthday',
+          [
+            {
+              type: 'body',
+              parameters: [
+                { type: 'text', text: customer.name || 'Friend' },
+                { type: 'text', text: merchant.shop_name }
+              ]
+            }
+          ]
         );
 
         await supabase.from('message_logs').insert({

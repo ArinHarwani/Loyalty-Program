@@ -59,9 +59,17 @@ export async function GET(request: NextRequest) {
           ? enrollment.customer.whatsapp_number
           : `91${enrollment.customer.whatsapp_number}`;
 
-        await sendWhatsAppMessage(
+        await sendWhatsAppTemplate(
           waNumber,
-          `⚠️ Your loyalty goal at ${enrollment.merchant.shop_name} expires soon!\n\nProgress: ${current} / ${target}\n🎁 Prize: ${enrollment.campaign.reward_description}\n\nVisit the shop before it's too late!`
+          '3_days_expiry_warning',
+          [
+            {
+              type: 'body',
+              parameters: [
+                { type: 'text', text: enrollment.merchant.shop_name }
+              ]
+            }
+          ]
         );
 
         // Mark warning sent
