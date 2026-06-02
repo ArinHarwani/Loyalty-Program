@@ -18,7 +18,9 @@ export async function GET(request: NextRequest) {
   let sent = 0;
 
   try {
-    const today = new Date();
+    // Ensure we are strictly calculating the date in Indian Standard Time (IST)
+    // Vercel servers run in UTC, which could cause date mismatches if the cron runs early morning
+    const today = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
     const month = today.getMonth() + 1; // 1-indexed
     const day = today.getDate();
 
