@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase';
 import { sendWhatsAppMessage } from '@/lib/whatsapp';
-import { processJoin, processTransaction } from '@/lib/scan-logic';
+import { processJoin, processTransaction, handleStatusCheck } from '@/lib/scan-logic';
 import crypto from 'crypto';
 
 // GET — Meta verification challenge
@@ -66,6 +66,19 @@ export async function POST(request: NextRequest) {
 
     const message = messages[0];
     const senderNumber = message.from; // e.g. "919876543210"
+
+    // Check for button reply (Quick Reply from templates like account_update)
+    const buttonReply = message?.interactive?.button_reply;
+    const buttonPayload = message?.button?.payload; // some API versions use this
+    const payload = buttonReply?.id || buttonPayload;
+
+    if (payload && payload.startsWith('STATUS-')) {
+      const enrollmentId = payload.replace('STATUS-', '').trim();
+      const supabase = createServiceClient();
+      await handleStatusCheck(enrollmentId, senderNumber, supabase);
+      return NextResponse.json({ status: 'ok' }, { status: 200 });
+    }
+
     const messageText = message.text?.body?.trim() || '';
 
     if (!messageText) {

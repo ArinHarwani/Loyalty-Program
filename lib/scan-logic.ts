@@ -329,3 +329,68 @@ export async function processTransaction(
     status: 'sent',
   });
 }
+
+export async function handleStatusCheck(
+  enrollmentId: string,
+  senderNumber: string,
+  supabase: SupabaseClient
+): Promise<void> {
+  // Fetch enrollment with campaign and merchant data
+  const { data: enrollment } = await supabase
+    .from('enrollments')
+    .select('*, campaigns(*), merchants(shop_name)')
+    .eq('id', enrollmentId)
+    .single();
+
+  if (!enrollment) {
+    await sendWhatsAppMessage(
+      senderNumber,
+      'Sorry, we could not find your account details. Please scan the QR at the shop.'
+    );
+    return;
+  }
+
+  const daysLeft = daysRemaining(enrollment.deadline_at);
+  const campaign = enrollment.campaigns;
+  const shopName = enrollment.merchants.shop_name;
+
+  let progressText = '';
+  if (campaign.campaign_type === 'amount') {
+    const percentage = calcPercentage(enrollment.total_spent, campaign.target_amount);
+    progressText = `₹${enrollment.total_spent} / ₹${campaign.target_amount} (${percentage}%)`;
+  } else {
+    const percentage = calcPercentage(enrollment.total_visits, campaign.target_visits);
+    progressText = `${enrollment.total_visits} / ${campaign.target_visits} visits (${percentage}%)`;
+  }
+
+  const message = `${shopName} — Account Status 📊
+
+Progress: ${progressText}
+Days remaining: ${daysLeft}
+Reward: ${campaign.reward_description}
+
+${daysLeft <= 3 ? '⚠️ Your period ends very soon!' : 'Keep going! 🎯'}`;
+
+  await sendWhatsAppMessage(senderNumber, message);
+
+  // Strip country code for DB lookup (DB stores 10-digit numbers)
+  const customerNumber = senderNumber.startsWith('91')
+    ? senderNumber.substring(2)
+    : senderNumber;
+
+  // Update last_whatsapp_at since customer initiated
+  await supabase
+    .from('customers')
+    .update({ last_whatsapp_at: new Date().toISOString() })
+    .eq('whatsapp_number', customerNumber);
+
+  // Log as service message (free — customer initiated by tapping button)
+  await supabase.from('message_logs').insert({
+    customer_id: enrollment.customer_id,
+    merchant_id: enrollment.merchant_id,
+    template_name: 'status_check',
+    category: 'service',
+    cost: 0,
+    status: 'sent',
+  });
+}

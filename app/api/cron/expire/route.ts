@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase';
-import { sendWhatsAppMessage } from '@/lib/whatsapp';
+import { sendWhatsAppTemplate } from '@/lib/whatsapp';
 
 export async function GET(request: NextRequest) {
   // Verify cron secret
@@ -61,12 +61,20 @@ export async function GET(request: NextRequest) {
 
         await sendWhatsAppTemplate(
           waNumber,
-          '3_days_expiry_warning',
+          'account_update',
           [
             {
               type: 'body',
               parameters: [
                 { type: 'text', text: enrollment.merchant.shop_name }
+              ]
+            },
+            {
+              type: 'button',
+              sub_type: 'quick_reply',
+              index: '0',
+              parameters: [
+                { type: 'payload', payload: `STATUS-${enrollment.id}` }
               ]
             }
           ]
@@ -81,9 +89,9 @@ export async function GET(request: NextRequest) {
         await supabase.from('message_logs').insert({
           merchant_id: enrollment.merchant_id,
           customer_id: enrollment.customer_id,
-          template_name: 'loyalty_expiry_warning',
+          template_name: 'account_update',
           category: 'utility',
-          cost: 0.11,
+          cost: 0.115,
           status: 'sent',
         });
 
