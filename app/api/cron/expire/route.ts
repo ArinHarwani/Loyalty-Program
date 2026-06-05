@@ -1,6 +1,10 @@
 // ============================================================
 // Cron: Expire — runs daily at 1 AM IST
-// Marks expired enrollments, sends warnings
+// 1. Marks past-deadline enrollments as expired
+// 2. Sends 3-day warning via approved Meta template "account_update"
+// Template name: "account_update" (Utility)
+// Variables: {{1}} = shop name
+// Button: Quick Reply "Check Status" with payload STATUS-{enrollmentId}
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -17,13 +21,14 @@ export async function GET(request: NextRequest) {
   const supabase = createServiceClient();
   let expired = 0;
   let warnings = 0;
+  let warningsFailed = 0;
 
   try {
     // 1. Mark expired enrollments
     const now = new Date().toISOString();
     const { data: expiredEnrollments } = await supabase
       .from('enrollments')
-      .select('*, customer:customers(*), merchant:merchants(*)')
+      .select('*')
       .eq('status', 'active')
       .lt('deadline_at', now);
 
@@ -36,29 +41,31 @@ export async function GET(request: NextRequest) {
       expired++;
     }
 
-    // 2. Send 3-day warning (only if warning_sent = false)
-    const threeDaysFromNow = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+    // 2. Send 3-day warning via account_update template
+    // Only send if warning_sent = false (prevents duplicates)
     const { data: warningEnrollments } = await supabase
       .from('enrollments')
-      .select('*, customer:customers(*), merchant:merchants(*), campaign:campaigns(*)')
+      .select('*, customers(*), merchants(*), campaigns(*)')
       .eq('status', 'active')
       .eq('warning_sent', false)
-      .lt('deadline_at', threeDaysFromNow)
+      .lt('deadline_at', new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString())
       .gt('deadline_at', now);
 
     for (const enrollment of warningEnrollments || []) {
-      if (enrollment.customer && enrollment.merchant && enrollment.campaign) {
-        const target = enrollment.campaign.campaign_type === 'amount'
-          ? `₹${enrollment.campaign.target_amount}`
-          : `${enrollment.campaign.target_visits} visits`;
-        const current = enrollment.campaign.campaign_type === 'amount'
-          ? `₹${enrollment.total_spent}`
-          : `${enrollment.total_visits} visits`;
+      // Guard: skip if any required relation is missing
+      if (!enrollment.customers || !enrollment.merchants || !enrollment.campaigns) continue;
 
-        const waNumber = enrollment.customer.whatsapp_number.startsWith('91')
-          ? enrollment.customer.whatsapp_number
-          : `91${enrollment.customer.whatsapp_number}`;
+      // Guard: skip inactive/blocked merchants
+      if (enrollment.merchants.subscription_status !== 'active') continue;
 
+      // Guard: skip if customer has no WhatsApp number
+      if (!enrollment.customers.whatsapp_number) continue;
+
+      const waNumber = enrollment.customers.whatsapp_number.startsWith('91')
+        ? enrollment.customers.whatsapp_number
+        : `91${enrollment.customers.whatsapp_number}`;
+
+      try {
         await sendWhatsAppTemplate(
           waNumber,
           'account_update',
@@ -66,7 +73,7 @@ export async function GET(request: NextRequest) {
             {
               type: 'body',
               parameters: [
-                { type: 'text', text: enrollment.merchant.shop_name }
+                { type: 'text', text: enrollment.merchants.shop_name }  // {{1}} = shop name
               ]
             },
             {
@@ -74,18 +81,22 @@ export async function GET(request: NextRequest) {
               sub_type: 'quick_reply',
               index: '0',
               parameters: [
-                { type: 'payload', payload: `STATUS-${enrollment.id}` }
+                {
+                  type: 'payload',
+                  payload: `STATUS-${enrollment.id}`
+                }
               ]
             }
           ]
         );
 
-        // Mark warning sent
+        // Mark warning as sent — CRITICAL: prevents sending twice
         await supabase
           .from('enrollments')
           .update({ warning_sent: true })
           .eq('id', enrollment.id);
 
+        // Log as sent
         await supabase.from('message_logs').insert({
           merchant_id: enrollment.merchant_id,
           customer_id: enrollment.customer_id,
@@ -96,13 +107,28 @@ export async function GET(request: NextRequest) {
         });
 
         warnings++;
+      } catch (error) {
+        console.error(`Expiry warning failed for enrollment ${enrollment.id}:`, error);
+
+        // Log as failed — one failure should not stop the entire loop
+        await supabase.from('message_logs').insert({
+          merchant_id: enrollment.merchant_id,
+          customer_id: enrollment.customer_id,
+          template_name: 'account_update',
+          category: 'utility',
+          cost: 0.115,
+          status: 'failed',
+        });
+
+        warningsFailed++;
       }
     }
 
     return NextResponse.json({
       success: true,
       expired,
-      warnings,
+      warnings_sent: warnings,
+      warnings_failed: warningsFailed,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

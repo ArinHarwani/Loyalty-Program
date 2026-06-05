@@ -335,62 +335,85 @@ export async function handleStatusCheck(
   senderNumber: string,
   supabase: SupabaseClient
 ): Promise<void> {
-  // Fetch enrollment with campaign and merchant data
-  const { data: enrollment } = await supabase
+  // Fetch enrollment with all related data
+  // Use alias syntax (merchant:merchants) so Supabase returns a single object, not an array
+  const { data: enrollment, error } = await supabase
     .from('enrollments')
-    .select('*, campaigns(*), merchants(shop_name)')
+    .select(`
+      id,
+      total_spent,
+      total_visits,
+      deadline_at,
+      status,
+      merchant_id,
+      customer_id,
+      campaign:campaigns (
+        campaign_type,
+        target_amount,
+        target_visits,
+        reward_description
+      ),
+      merchant:merchants (
+        shop_name
+      )
+    `)
     .eq('id', enrollmentId)
     .single();
 
-  if (!enrollment) {
+  if (error || !enrollment || !enrollment.campaign || !enrollment.merchant) {
     await sendWhatsAppMessage(
       senderNumber,
-      'Sorry, we could not find your account details. Please scan the QR at the shop.'
+      'Sorry, we could not find your account details. Please scan the QR at the shop counter.'
     );
     return;
   }
 
   const daysLeft = daysRemaining(enrollment.deadline_at);
-  const campaign = enrollment.campaigns;
-  const shopName = enrollment.merchants.shop_name;
+  const campaign = enrollment.campaign as any;
+  const shopName = (enrollment.merchant as any).shop_name;
+  const customerNumber = senderNumber.startsWith('91')
+    ? senderNumber.substring(2)
+    : senderNumber;
 
+  // Build progress text based on campaign type
   let progressText = '';
+
   if (campaign.campaign_type === 'amount') {
-    const percentage = calcPercentage(enrollment.total_spent, campaign.target_amount);
-    progressText = `₹${enrollment.total_spent} / ₹${campaign.target_amount} (${percentage}%)`;
+    const percentageDone = calcPercentage(enrollment.total_spent, campaign.target_amount);
+    progressText = `₹${Number(enrollment.total_spent).toLocaleString('en-IN')} / ₹${Number(campaign.target_amount).toLocaleString('en-IN')} (${percentageDone}%)`;
   } else {
-    const percentage = calcPercentage(enrollment.total_visits, campaign.target_visits);
-    progressText = `${enrollment.total_visits} / ${campaign.target_visits} visits (${percentage}%)`;
+    const percentageDone = calcPercentage(enrollment.total_visits, campaign.target_visits);
+    progressText = `${enrollment.total_visits} / ${campaign.target_visits} visits (${percentageDone}%)`;
   }
 
-  const message = `${shopName} — Account Status 📊
+  // Build reply message
+  const message =
+`${shopName} — Account Status 📊
 
 Progress: ${progressText}
 Days remaining: ${daysLeft}
 Reward: ${campaign.reward_description}
 
-${daysLeft <= 3 ? '⚠️ Your period ends very soon!' : 'Keep going! 🎯'}`;
+${daysLeft <= 3 ? '⚠️ Hurry! Your period ends very soon.' : 'Keep it up! 🎯'}`;
 
+  // Send free service window reply (not a template)
   await sendWhatsAppMessage(senderNumber, message);
 
-  // Strip country code for DB lookup (DB stores 10-digit numbers)
-  const customerNumber = senderNumber.startsWith('91')
-    ? senderNumber.substring(2)
-    : senderNumber;
-
-  // Update last_whatsapp_at since customer initiated
+  // Update last_whatsapp_at — customer just messaged us
   await supabase
     .from('customers')
     .update({ last_whatsapp_at: new Date().toISOString() })
     .eq('whatsapp_number', customerNumber);
 
-  // Log as service message (free — customer initiated by tapping button)
+  // Log as service (free — customer initiated by tapping button)
   await supabase.from('message_logs').insert({
-    customer_id: enrollment.customer_id,
     merchant_id: enrollment.merchant_id,
-    template_name: 'status_check',
+    customer_id: enrollment.customer_id,
+    template_name: 'status_check_reply',
     category: 'service',
     cost: 0,
     status: 'sent',
   });
 }
+
+
