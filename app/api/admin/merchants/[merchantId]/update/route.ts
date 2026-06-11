@@ -55,7 +55,7 @@ export async function PATCH(
         .eq('is_current', true);
 
       // Insert new package record
-      const prices: Record<string, number> = { trial: 0, starter: 999, growth: 1499 };
+      const prices: Record<string, number> = { growth: 999, business: 1499, pro: 2499 };
       await service.from('merchant_packages').insert({
         merchant_id: merchantId,
         package_name,

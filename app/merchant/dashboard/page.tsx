@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
-import { formatCurrency, maskPhone, calcPercentage, daysRemaining, formatDateTime } from '@/lib/utils';
+import { formatCurrency, maskPhone, calcPercentage, daysRemaining, formatDateTime, formatDate } from '@/lib/utils';
+import { SUPPORT_WHATSAPP } from '@/lib/constants';
 import Link from 'next/link';
 import type { Merchant, Campaign, Enrollment, Transaction, Customer } from '@/types';
 
@@ -14,6 +15,7 @@ export default function DashboardPage() {
   const [enrollments, setEnrollments] = useState<(Enrollment & { customer?: Customer })[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [winners, setWinners] = useState<(Enrollment & { customer?: Customer })[]>([]);
+  const [totalCustomers, setTotalCustomers] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
@@ -36,6 +38,15 @@ export default function DashboardPage() {
       return;
     }
     setMerchant(merchantData);
+
+    // Count total unique customers (distinct customer_id from enrollments)
+    const { data: allEnrollments } = await supabase
+      .from('enrollments')
+      .select('customer_id')
+      .eq('merchant_id', merchantData.id);
+    
+    const uniqueCustomerIds = new Set((allEnrollments || []).map(e => e.customer_id));
+    setTotalCustomers(uniqueCustomerIds.size);
 
     // Get active campaign
     const { data: campaignData } = await supabase
@@ -111,6 +122,20 @@ export default function DashboardPage() {
     );
   }
 
+  // Compute plan usage
+  const customerLimit = merchant?.customer_limit || null;
+  const customerUsagePct = customerLimit ? Math.min(Math.round((totalCustomers / customerLimit) * 100), 100) : null;
+  const showLimitWarning = customerUsagePct !== null && customerUsagePct >= 80;
+
+  // Compute days left on subscription
+  let subDaysLeft = 0;
+  if (merchant?.subscription_end_date) {
+    const diffTime = new Date(merchant.subscription_end_date).getTime() - new Date().getTime();
+    subDaysLeft = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+  }
+
+  const waLink = `https://wa.me/${SUPPORT_WHATSAPP.replace('+', '')}`;
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
       {/* Nav */}
@@ -118,6 +143,7 @@ export default function DashboardPage() {
         <Link href="/merchant/dashboard" className="nav-brand">LoyaltyQR</Link>
         <div className="nav-links">
           <Link href="/merchant/analytics" className="nav-link">📊 Analytics</Link>
+          <Link href="/merchant/settings" className="nav-link">⚙️ Settings</Link>
           <button onClick={handleLogout} className="nav-link" style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
             Logout
           </button>
@@ -132,6 +158,98 @@ export default function DashboardPage() {
             {merchant?.shop_category} • Code: <strong>{merchant?.merchant_code}</strong>
           </p>
         </div>
+
+        {/* Plan Usage Card */}
+        {merchant?.subscription_plan && (
+          <div className="card" style={{ marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+              <div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>
+                  Your Plan
+                </div>
+                <h2 style={{ fontSize: '1.35rem', fontWeight: 800, textTransform: 'capitalize' }}>
+                  {merchant.subscription_plan}
+                </h2>
+              </div>
+              <span className={`badge ${merchant.subscription_plan === 'pro' ? 'badge-danger' : merchant.subscription_plan === 'business' ? 'badge-info' : 'badge-success'}`}>
+                Active
+              </span>
+            </div>
+
+            {/* Customer progress bar */}
+            {customerLimit && (
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.35rem' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>
+                    Customers: {totalCustomers.toLocaleString('en-IN')} / {customerLimit.toLocaleString('en-IN')}
+                  </span>
+                  <span style={{ fontWeight: 600, color: showLimitWarning ? 'var(--warning)' : 'var(--text-primary)' }}>
+                    {customerUsagePct}%
+                  </span>
+                </div>
+                <div className="progress-bar" style={{ height: '10px' }}>
+                  <div
+                    className="progress-fill"
+                    style={{
+                      width: `${customerUsagePct}%`,
+                      background: showLimitWarning ? 'var(--warning)' : 'var(--gradient-primary)',
+                      transition: 'width 0.5s ease',
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Subscription end date */}
+            {merchant.subscription_end_date && (
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                Subscription ends: <strong style={{ color: subDaysLeft <= 7 ? 'var(--warning)' : 'var(--text-primary)' }}>
+                  {formatDate(merchant.subscription_end_date)}
+                </strong>
+                <span style={{ color: subDaysLeft <= 7 ? 'var(--warning)' : 'var(--text-muted)' }}>
+                  {' '}({subDaysLeft} day{subDaysLeft !== 1 ? 's' : ''} left)
+                </span>
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* 80% Customer Limit Warning Banner */}
+        {showLimitWarning && (
+          <div
+            style={{
+              marginBottom: '1.5rem',
+              padding: '1rem 1.25rem',
+              background: 'rgba(234, 179, 8, 0.08)',
+              border: '1px solid rgba(234, 179, 8, 0.3)',
+              borderRadius: 'var(--radius-md)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '0.75rem',
+            }}
+          >
+            <div>
+              <div style={{ fontWeight: 700, color: 'var(--warning)', marginBottom: '0.25rem' }}>
+                ⚠️ Approaching Customer Limit
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
+                You&apos;re at {customerUsagePct}% of your customer limit ({totalCustomers.toLocaleString('en-IN')}/{customerLimit!.toLocaleString('en-IN')}).
+                Contact us to upgrade your plan.
+              </p>
+            </div>
+            <a
+              href={waLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-sm btn-primary"
+              style={{ textDecoration: 'none', whiteSpace: 'nowrap' }}
+            >
+              WhatsApp us →
+            </a>
+          </div>
+        )}
 
         {/* Primary CTA */}
         <Link
@@ -329,6 +447,49 @@ export default function DashboardPage() {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* Plan Info Section */}
+        {merchant?.subscription_plan && (
+          <div className="card" style={{ marginTop: '1.5rem' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>
+              📋 Your Current Plan
+            </h3>
+            <div style={{ display: 'grid', gap: '0.6rem' }}>
+              {[
+                { label: 'Plan', value: merchant.subscription_plan.charAt(0).toUpperCase() + merchant.subscription_plan.slice(1) },
+                { label: 'Customer limit', value: customerLimit ? customerLimit.toLocaleString('en-IN') : '—' },
+                { label: 'Customers enrolled', value: `${totalCustomers.toLocaleString('en-IN')} / ${customerLimit ? customerLimit.toLocaleString('en-IN') : '—'}` },
+                { label: 'Subscription ends', value: merchant.subscription_end_date ? formatDate(merchant.subscription_end_date) : '—' },
+              ].map(item => (
+                <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{item.label}</span>
+                  <span style={{ fontWeight: 600 }}>{item.value}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: '1rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <a
+                href={waLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-sm btn-secondary"
+                style={{ textDecoration: 'none' }}
+              >
+                💬 WhatsApp
+              </a>
+              <a
+                href={`mailto:${merchant.email}`}
+                className="btn btn-sm btn-secondary"
+                style={{ textDecoration: 'none' }}
+              >
+                📧 Email
+              </a>
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.75rem' }}>
+              Want to upgrade? Contact us via WhatsApp or email.
+            </p>
           </div>
         )}
 

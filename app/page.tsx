@@ -327,6 +327,136 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Pricing */}
+      <section id="pricing" style={{ padding: '4rem 1rem', maxWidth: '1000px', margin: '0 auto' }}>
+        <h2
+          style={{
+            textAlign: 'center',
+            fontSize: '1.75rem',
+            fontWeight: 800,
+            marginBottom: '0.5rem',
+          }}
+        >
+          Simple, Transparent Pricing
+        </h2>
+        <p
+          style={{
+            textAlign: 'center',
+            color: 'var(--text-secondary)',
+            marginBottom: '3rem',
+          }}
+        >
+          Choose a plan based on your customer base. Save up to 20% on 6-month plans.
+        </p>
+
+        <div className="grid-3">
+          {/* Growth Plan */}
+          <div className="card" style={{ position: 'relative', borderColor: 'rgba(16, 185, 129, 0.2)' }}>
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              <h3 style={{ fontWeight: 800, fontSize: '1.25rem', marginBottom: '0.25rem' }}>Growth</h3>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '0.25rem' }}>
+                <span style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--primary)' }}>₹999</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>/month</span>
+              </div>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.25rem' }}>Up to 1,000 customers</p>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.9rem' }}>
+              {[
+                'QR transactions',
+                'WhatsApp updates',
+                'Birthday messages',
+                'Expiry reminders',
+                'Dashboard analytics',
+              ].map(f => (
+                <div key={f} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ color: 'var(--success)' }}>✅</span> {f}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Business Plan — Most Popular */}
+          <div
+            className="card"
+            style={{
+              position: 'relative',
+              borderColor: 'var(--primary)',
+              borderWidth: '2px',
+              transform: 'scale(1.03)',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                top: '-12px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                background: 'var(--gradient-primary)',
+                color: '#fff',
+                padding: '0.25rem 0.85rem',
+                borderRadius: '999px',
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Most Popular
+            </div>
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              <h3 style={{ fontWeight: 800, fontSize: '1.25rem', marginBottom: '0.25rem' }}>Business</h3>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '0.25rem' }}>
+                <span style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--primary)' }}>₹1,499</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>/month</span>
+              </div>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.25rem' }}>Up to 2,000 customers</p>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.9rem' }}>
+              {[
+                'Everything in Growth',
+                'Advanced analytics',
+                'Campaign comparison',
+              ].map(f => (
+                <div key={f} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ color: 'var(--success)' }}>✅</span> {f}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Pro Plan */}
+          <div className="card" style={{ position: 'relative', borderColor: 'rgba(168, 85, 247, 0.25)' }}>
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              <h3 style={{ fontWeight: 800, fontSize: '1.25rem', marginBottom: '0.25rem' }}>Pro</h3>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '0.25rem' }}>
+                <span style={{ fontSize: '2rem', fontWeight: 900, color: '#a855f7' }}>₹2,499</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>/month</span>
+              </div>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.25rem' }}>Up to 5,000 customers</p>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.9rem' }}>
+              {[
+                'Everything in Business',
+                'Broadcast messaging',
+                'Priority support',
+              ].map(f => (
+                <div key={f} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ color: 'var(--success)' }}>✅</span> {f}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '2rem' }}>
+          💡 Save up to 20% on 6-month plans.{' '}
+          <Link href="/contact" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 600 }}>
+            Contact us for pricing →
+          </Link>
+        </p>
+      </section>
+
       {/* CTA */}
       <section
         style={{

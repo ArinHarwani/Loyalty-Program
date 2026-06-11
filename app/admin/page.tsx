@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase';
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils';
 import Link from 'next/link';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell,
 } from 'recharts';
 import type { AdminOverview, AdminMerchantRow } from '@/types';
@@ -300,8 +300,8 @@ export default function AdminPage() {
                       <td style={{ fontWeight: 600 }}>{m.shop_name}</td>
                       <td>{m.shop_category || '-'}</td>
                       <td>
-                        <span className={`badge ${m.subscription_plan === 'growth' ? 'badge-success' : m.subscription_plan === 'starter' ? 'badge-info' : 'badge-muted'}`}>
-                          {m.subscription_plan || 'None'}
+                        <span className={`badge ${m.subscription_plan === 'pro' ? 'badge-danger' : m.subscription_plan === 'business' ? 'badge-info' : m.subscription_plan === 'growth' ? 'badge-success' : 'badge-muted'}`}>
+                          {m.subscription_plan ? m.subscription_plan.charAt(0).toUpperCase() + m.subscription_plan.slice(1) : 'None'}
                         </span>
                       </td>
                       <td>

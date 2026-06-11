@@ -11,6 +11,7 @@ export default function MerchantLoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showForgotMessage, setShowForgotMessage] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,7 +73,16 @@ export default function MerchantLoginPage() {
             </div>
 
             <div style={{ marginBottom: '1.5rem' }}>
-              <label className="label">Password</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label className="label" style={{ marginBottom: 0 }}>Password</label>
+                <button 
+                  type="button" 
+                  onClick={() => setShowForgotMessage(true)}
+                  style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 600, padding: 0 }}
+                >
+                  Forgot Password?
+                </button>
+              </div>
               <input
                 type="password"
                 className="input"
@@ -80,8 +90,15 @@ export default function MerchantLoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                style={{ marginTop: '0.5rem' }}
               />
             </div>
+
+            {showForgotMessage && (
+              <div className="alert alert-warning" style={{ marginBottom: '1.25rem' }}>
+                ℹ️ Please contact the team for changing password.
+              </div>
+            )}
 
             {error && (
               <div className="alert alert-error" style={{ marginBottom: '1.25rem' }}>

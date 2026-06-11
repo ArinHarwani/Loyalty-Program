@@ -33,9 +33,15 @@ export default function NewCampaignPage() {
     return d.toISOString().split('T')[0];
   })();
 
+  const [now, setNow] = useState<number>(0);
+  useEffect(() => { 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNow(Date.now()); 
+  }, []);
+
   // Calculate how many days the specific end date represents (for preview)
-  const computedDurationDays = durationMode === 'specific' && endDate
-    ? Math.ceil((new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+  const computedDurationDays = durationMode === 'specific' && endDate && now > 0
+    ? Math.ceil((new Date(endDate).getTime() - now) / (1000 * 60 * 60 * 24))
     : durationDays;
 
   // Format end date for preview display

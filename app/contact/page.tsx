@@ -10,7 +10,7 @@ export default function ContactPage() {
       <div className="container" style={{ padding: '4rem 1rem', maxWidth: '800px', margin: '0 auto' }}>
         <h1 style={{ fontSize: '2.5rem', fontWeight: 900, marginBottom: '1.5rem' }}>Contact Us</h1>
         <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', fontSize: '1.1rem' }}>
-          Have questions, need support, or want to report an issue? We're here to help!
+          Have questions, need support, or want to report an issue? We&apos;re here to help!
         </p>
 
         <div className="card" style={{ marginBottom: '2rem' }}>

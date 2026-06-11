@@ -170,7 +170,7 @@ export default function ScanPage() {
       setErrorMsg('Network error. Please try again.');
       setSubmitting(false);
     }
-  }, [whatsappNumber, birthMonth, birthDay, token, submitting]);
+  }, [whatsappNumber, customerName, birthMonth, birthDay, token, submitting]);
 
   // Start auto-countdown for returning customers
   useEffect(() => {

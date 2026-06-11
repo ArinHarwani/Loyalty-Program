@@ -16,6 +16,7 @@ export interface Merchant {
   subscription_status: 'inactive' | 'active' | 'blocked';
   subscription_end_date: string | null;
   subscription_plan: string | null;
+  customer_limit: number | null;
   last_login_at: string | null;
   notes: string | null;
   created_at: string;
@@ -93,7 +94,7 @@ export interface MessageLog {
 export interface MerchantPackage {
   id: string;
   merchant_id: string;
-  package_name: 'trial' | 'starter' | 'growth';
+  package_name: 'growth' | 'business' | 'pro' | 'custom';
   price: number;
   started_at: string;
   ended_at: string | null;
@@ -112,8 +113,9 @@ export interface MerchantStatusLog {
 export interface Subscription {
   id: string;
   merchant_id: string;
-  plan_name: 'starter' | 'growth' | 'custom';
+  plan_name: 'growth' | 'business' | 'pro' | 'custom';
   price: number;
+  duration_months: number;
   start_date: string;
   end_date: string;
   status: 'active' | 'expired' | 'cancelled';
@@ -234,6 +236,7 @@ export interface AdminMerchantRow {
   subscription_status: 'inactive' | 'active' | 'blocked';
   subscription_plan: string | null;
   subscription_end_date: string | null;
+  customer_limit: number | null;
   campaigns: number;
   customers_this_month: number;
   transactions_this_month: number;

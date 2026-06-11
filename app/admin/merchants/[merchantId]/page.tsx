@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { PLANS, MULTI_MONTH_DISCOUNTS, calculateMultiMonthPrice } from '@/lib/plans';
+import type { PlanKey, DurationMonths } from '@/lib/plans';
 import Link from 'next/link';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -21,16 +23,46 @@ export default function MerchantDetailPage() {
   
   // Modal states
   const [showActivateModal, setShowActivateModal] = useState(false);
-  const [showBlockModal, setShowBlockModal] = useState(false);
   
   // Activate Form
-  const [planName, setPlanName] = useState('starter');
-  const [price, setPrice] = useState('999');
+  const [planName, setPlanName] = useState<string>('growth');
+  const [durationMonths, setDurationMonths] = useState<DurationMonths>(1);
+  const [customPrice, setCustomPrice] = useState('0');
+  const [customLimit, setCustomLimit] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('upi');
   const [utr, setUtr] = useState('');
   const [notes, setNotes] = useState('');
   const [startDate, setStartDate] = useState('');
+  const [endDateOverride, setEndDateOverride] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Calculated price for the modal
+  const calculatedPrice = useMemo(() => {
+    if (planName === 'custom') {
+      return {
+        original_total: Number(customPrice) * durationMonths,
+        discount_percent: 0,
+        discount_amount: 0,
+        final_total: Number(customPrice) * durationMonths,
+        monthly_effective: Number(customPrice),
+      };
+    }
+    if (planName in PLANS) {
+      return calculateMultiMonthPrice(planName as PlanKey, durationMonths);
+    }
+    return { original_total: 0, discount_percent: 0, discount_amount: 0, final_total: 0, monthly_effective: 0 };
+  }, [planName, durationMonths, customPrice]);
+
+  // Amount received — starts at calculated total, but admin can override
+  const [amountOverride, setAmountOverride] = useState<string>('');
+  
+  const effectiveAmount = amountOverride !== '' ? Number(amountOverride) : calculatedPrice.final_total;
+
+  // Sync amount override when calculated price changes
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAmountOverride('');
+  }, [planName, durationMonths, customPrice]);
 
   const loadData = async () => {
     try {
@@ -65,18 +97,14 @@ export default function MerchantDetailPage() {
     }
   };
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (merchantId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       loadData();
     }
   }, [merchantId]);
-
-  const handlePlanChange = (plan: string) => {
-    setPlanName(plan);
-    if (plan === 'starter') setPrice('999');
-    else if (plan === 'growth') setPrice('1499');
-    else setPrice('0');
-  };
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const handleActivate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,17 +120,21 @@ export default function MerchantDetailPage() {
         },
         body: JSON.stringify({
           plan_name: planName,
-          price: Number(price),
+          price: effectiveAmount,
+          duration_months: durationMonths,
           payment_method: paymentMethod,
           utr_number: utr,
           start_date: startDate,
+          end_date_override: endDateOverride || undefined,
           notes,
+          customer_limit: planName === 'custom' ? Number(customLimit) || null : undefined,
         }),
       });
       
       if (!response.ok) throw new Error('Activation failed');
       
       setShowActivateModal(false);
+      setAmountOverride('');
       loadData();
     } catch {
       alert('Failed to activate subscription');
@@ -181,6 +213,11 @@ export default function MerchantDetailPage() {
     else daysLeftText = `${daysLeft} days`;
   }
 
+  // Customer usage percentage
+  const customerUsagePct = merchant.customer_limit
+    ? Math.min(Math.round((customer_stats.total / merchant.customer_limit) * 100), 100)
+    : null;
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
       <nav className="nav">
@@ -203,6 +240,11 @@ export default function MerchantDetailPage() {
                 <span className={`badge ${merchant.subscription_status === 'active' ? 'badge-success' : merchant.subscription_status === 'blocked' ? 'badge-danger' : 'badge-warning'}`}>
                   {merchant.subscription_status}
                 </span>
+                {merchant.subscription_plan && (
+                  <span className={`badge ${merchant.subscription_plan === 'pro' ? 'badge-danger' : merchant.subscription_plan === 'business' ? 'badge-info' : merchant.subscription_plan === 'growth' ? 'badge-success' : 'badge-muted'}`}>
+                    {merchant.subscription_plan.charAt(0).toUpperCase() + merchant.subscription_plan.slice(1)} Plan
+                  </span>
+                )}
                 <span className="badge badge-muted">
                   Joined {formatDate(merchant.created_at)}
                 </span>
@@ -226,11 +268,28 @@ export default function MerchantDetailPage() {
             💳 Subscription Management
           </h2>
           
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
             <div>
               <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Current Plan</div>
               <div style={{ fontSize: '1.25rem', fontWeight: 600, textTransform: 'capitalize' }}>
                 {merchant.subscription_plan || 'None'}
+              </div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Customer Limit</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>
+                {merchant.customer_limit ? merchant.customer_limit.toLocaleString('en-IN') : '—'}
+              </div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Customers Enrolled</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>
+                {customer_stats.total.toLocaleString('en-IN')}
+                {merchant.customer_limit && (
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 400 }}>
+                    {' '}/ {merchant.customer_limit.toLocaleString('en-IN')}
+                  </span>
+                )}
               </div>
             </div>
             <div>
@@ -251,6 +310,27 @@ export default function MerchantDetailPage() {
             </div>
           </div>
 
+          {/* Customer usage bar */}
+          {customerUsagePct !== null && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.35rem' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Customer Usage</span>
+                <span style={{ fontWeight: 600, color: customerUsagePct >= 80 ? 'var(--warning)' : 'var(--text-primary)' }}>
+                  {customerUsagePct}%
+                </span>
+              </div>
+              <div className="progress-bar" style={{ height: '8px' }}>
+                <div
+                  className="progress-fill"
+                  style={{
+                    width: `${customerUsagePct}%`,
+                    background: customerUsagePct >= 80 ? 'var(--warning)' : 'var(--gradient-primary)',
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
             {merchant.subscription_status === 'active' ? (
               <>
@@ -259,7 +339,7 @@ export default function MerchantDetailPage() {
                   onClick={() => setShowActivateModal(true)}
                   disabled={actionLoading}
                 >
-                  {daysLeft <= 7 ? '🚀 Renew Subscription' : 'Update / Extend'}
+                  {daysLeft <= 7 ? '🚀 Renew Subscription' : '🔄 Renew / Change Plan'}
                 </button>
                 <button 
                   className="btn btn-danger"
@@ -301,6 +381,7 @@ export default function MerchantDetailPage() {
               <thead>
                 <tr>
                   <th>Plan</th>
+                  <th>Duration</th>
                   <th>Price</th>
                   <th>Start</th>
                   <th>End</th>
@@ -313,6 +394,7 @@ export default function MerchantDetailPage() {
                 {subscription_history.map(sub => (
                   <tr key={sub.id}>
                     <td style={{ textTransform: 'capitalize', fontWeight: 600 }}>{sub.plan_name}</td>
+                    <td>{sub.duration_months || 1} mo</td>
                     <td>{formatCurrency(sub.price)}</td>
                     <td style={{ color: 'var(--text-muted)' }}>{formatDate(sub.start_date)}</td>
                     <td style={{ color: 'var(--text-muted)' }}>{formatDate(sub.end_date)}</td>
@@ -496,36 +578,194 @@ export default function MerchantDetailPage() {
         </div>
       </div>
 
-      {/* Activate/Renew Modal */}
+      {/* Activate/Renew Modal — Rebuilt with new plan structure */}
       {showActivateModal && (
         <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="card slide-up" style={{ width: '100%', maxWidth: '500px', padding: '2rem' }}>
+          <div className="card slide-up" style={{ width: '100%', maxWidth: '580px', padding: '2rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1.5rem' }}>
-              Activate / Renew Subscription
+              {merchant.subscription_status === 'active' ? 'Renew / Change Plan' : 'Activate Subscription'}
             </h2>
             
             <form onSubmit={handleActivate}>
+              {/* Plan Selection — Radio buttons */}
               <div style={{ marginBottom: '1.25rem' }}>
-                <label className="label">Plan Name</label>
-                <select className="select" value={planName} onChange={e => handlePlanChange(e.target.value)} required>
-                  <option value="starter">Starter Plan (₹999/mo)</option>
-                  <option value="growth">Growth Plan (₹1,499/mo)</option>
-                  <option value="custom">Custom Plan</option>
-                </select>
+                <label className="label">Plan</label>
+                <div style={{ display: 'grid', gap: '0.5rem' }}>
+                  {(Object.entries(PLANS) as [PlanKey, typeof PLANS[PlanKey]][]).map(([key, plan]) => (
+                    <label
+                      key={key}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        padding: '0.75rem 1rem',
+                        background: planName === key ? 'rgba(16, 185, 129, 0.08)' : 'var(--bg-surface)',
+                        border: `1.5px solid ${planName === key ? 'var(--primary)' : 'var(--border)'}`,
+                        borderRadius: 'var(--radius-md)',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="plan"
+                        value={key}
+                        checked={planName === key}
+                        onChange={() => setPlanName(key)}
+                        style={{ accentColor: 'var(--primary)' }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600 }}>{plan.name}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          {plan.description}
+                        </div>
+                      </div>
+                      <div style={{ fontWeight: 700, color: 'var(--primary)' }}>
+                        ₹{plan.monthly_price.toLocaleString('en-IN')}/mo
+                      </div>
+                    </label>
+                  ))}
+                  {/* Custom plan option */}
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      padding: '0.75rem 1rem',
+                      background: planName === 'custom' ? 'rgba(16, 185, 129, 0.08)' : 'var(--bg-surface)',
+                      border: `1.5px solid ${planName === 'custom' ? 'var(--primary)' : 'var(--border)'}`,
+                      borderRadius: 'var(--radius-md)',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="plan"
+                      value="custom"
+                      checked={planName === 'custom'}
+                      onChange={() => setPlanName('custom')}
+                      style={{ accentColor: 'var(--primary)' }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600 }}>Custom</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        Special pricing — enter amount manually
+                      </div>
+                    </div>
+                  </label>
+                </div>
               </div>
-              
+
+              {/* Custom plan fields */}
+              {planName === 'custom' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+                  <div>
+                    <label className="label">Monthly Price (₹)</label>
+                    <input type="number" className="input" value={customPrice} onChange={e => setCustomPrice(e.target.value)} required min="0" />
+                  </div>
+                  <div>
+                    <label className="label">Customer Limit</label>
+                    <input type="number" className="input" value={customLimit} onChange={e => setCustomLimit(e.target.value)} placeholder="e.g. 3000" min="1" />
+                  </div>
+                </div>
+              )}
+
+              {/* Duration Selection — Radio buttons */}
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label className="label">Duration</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+                  {([1, 2, 3, 6] as DurationMonths[]).map(m => (
+                    <label
+                      key={m}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        padding: '0.75rem 0.5rem',
+                        background: durationMonths === m ? 'rgba(16, 185, 129, 0.08)' : 'var(--bg-surface)',
+                        border: `1.5px solid ${durationMonths === m ? 'var(--primary)' : 'var(--border)'}`,
+                        borderRadius: 'var(--radius-md)',
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="duration"
+                        value={m}
+                        checked={durationMonths === m}
+                        onChange={() => setDurationMonths(m)}
+                        style={{ accentColor: 'var(--primary)', marginBottom: '0.25rem' }}
+                      />
+                      <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{m} mo</span>
+                      {MULTI_MONTH_DISCOUNTS[m] > 0 && (
+                        <span style={{ fontSize: '0.7rem', color: 'var(--success)', fontWeight: 600 }}>
+                          {MULTI_MONTH_DISCOUNTS[m]}% off
+                        </span>
+                      )}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Live Price Calculator */}
+              <div style={{
+                marginBottom: '1.25rem',
+                padding: '1rem',
+                background: 'var(--bg-surface)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border)',
+              }}>
+                <div style={{ fontWeight: 700, marginBottom: '0.75rem', fontSize: '0.9rem' }}>
+                  💰 Price Calculation
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.85rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>
+                      {planName === 'custom' ? 'Custom' : PLANS[planName as PlanKey]?.name} × {durationMonths} month{durationMonths > 1 ? 's' : ''}
+                    </span>
+                    <span>{formatCurrency(calculatedPrice.original_total)}</span>
+                  </div>
+                  {calculatedPrice.discount_percent > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--success)' }}>
+                      <span>Discount ({calculatedPrice.discount_percent}%)</span>
+                      <span>-{formatCurrency(calculatedPrice.discount_amount)}</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, borderTop: '1px solid var(--border)', paddingTop: '0.35rem', marginTop: '0.25rem' }}>
+                    <span>Total to collect</span>
+                    <span style={{ color: 'var(--primary)' }}>{formatCurrency(calculatedPrice.final_total)}</span>
+                  </div>
+                  {durationMonths > 1 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      <span>Effective</span>
+                      <span>{formatCurrency(calculatedPrice.monthly_effective)}/month</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Amount + Payment */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
                 <div>
-                  <label className="label">Amount (₹)</label>
-                  <input type="number" className="input" value={price} onChange={e => setPrice(e.target.value)} required min="0" />
+                  <label className="label">Amount Received (₹)</label>
+                  <input
+                    type="number"
+                    className="input"
+                    value={amountOverride !== '' ? amountOverride : String(calculatedPrice.final_total)}
+                    onChange={e => setAmountOverride(e.target.value)}
+                    required
+                    min="0"
+                  />
                 </div>
                 <div>
                   <label className="label">Payment Method</label>
                   <select className="select" value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} required>
                     <option value="upi">UPI</option>
                     <option value="cash">Cash</option>
-                    <option value="bank">Bank Transfer</option>
-                    <option value="free">Free / Comped</option>
+                    <option value="free">Free (own shop)</option>
                   </select>
                 </div>
               </div>
@@ -537,21 +777,29 @@ export default function MerchantDetailPage() {
                 </div>
               )}
               
-              <div style={{ marginBottom: '1.25rem' }}>
-                <label className="label">Start Date</label>
-                <input type="date" className="input" value={startDate} onChange={e => setStartDate(e.target.value)} required />
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                  End date will be automatically set to +30 days.
-                </p>
-              </div>
-
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label className="label">Notes (Optional)</label>
-                <input type="text" className="input" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any internal notes" />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+                <div>
+                  <label className="label">Start Date</label>
+                  <input type="date" className="input" value={startDate} onChange={e => setStartDate(e.target.value)} required />
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                    End: +{durationMonths * 30} days
+                  </p>
+                </div>
+                <div>
+                  <label className="label">End Date (Override)</label>
+                  <input type="date" className="input" value={endDateOverride} onChange={e => setEndDateOverride(e.target.value)} />
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                    Optional. Replaces calculated end date.
+                  </p>
+                </div>
+                <div>
+                  <label className="label">Notes (Optional)</label>
+                  <input type="text" className="input" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any internal notes" />
+                </div>
               </div>
               
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowActivateModal(false)} disabled={actionLoading}>
+                <button type="button" className="btn btn-secondary" onClick={() => { setShowActivateModal(false); setAmountOverride(''); }} disabled={actionLoading}>
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={actionLoading}>

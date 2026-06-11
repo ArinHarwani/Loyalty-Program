@@ -176,6 +176,26 @@ export async function POST(request: NextRequest) {
     if (!enrollment) {
       isNewEnrollment = true;
 
+      // ---------------------------------------------------------
+      // CUSTOMER QUOTA ENFORCEMENT
+      // ---------------------------------------------------------
+      // Only check quota if we are creating a *new* enrollment. 
+      // Existing active/completed enrollments bypass this.
+      if (merchant.customer_limit) {
+        // Count unique customers for this merchant
+        const { count, error: countError } = await supabase
+          .from('enrollments')
+          .select('customer_id', { count: 'exact', head: true })
+          .eq('merchant_id', merchant.id);
+          
+        if (!countError && count !== null && count >= merchant.customer_limit) {
+          return NextResponse.json(
+            { error: 'This shop has reached its maximum loyalty capacity for now. Please inform the shopkeeper.' },
+            { status: 403 }
+          );
+        }
+      }
+
       // Check max winners
       if (campaign.max_winners) {
         const { count } = await supabase

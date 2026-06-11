@@ -157,6 +157,22 @@ export async function processTransaction(
     .single();
 
   if (!enrollment) {
+    // Check if the merchant has reached their customer limit
+    if (merchant.customer_limit) {
+      const { count, error: countError } = await supabase
+        .from('enrollments')
+        .select('customer_id', { count: 'exact', head: true })
+        .eq('merchant_id', merchant.id);
+
+      if (!countError && count !== null && count >= merchant.customer_limit) {
+        await sendWhatsAppMessage(
+          senderNumber,
+          "We're sorry, but this shop has reached its maximum loyalty capacity at the moment. Please ask the shopkeeper to upgrade their plan."
+        );
+        return;
+      }
+    }
+
     // Edge case: customer exists but no enrollment — auto-create one
     const deadline = new Date();
     deadline.setDate(deadline.getDate() + campaign.duration_days);
@@ -369,8 +385,8 @@ export async function handleStatusCheck(
   }
 
   const daysLeft = daysRemaining(enrollment.deadline_at);
-  const campaign = enrollment.campaign as any;
-  const shopName = (enrollment.merchant as any).shop_name;
+  const campaign = enrollment.campaign as unknown as import('@/types').Campaign;
+  const shopName = (enrollment.merchant as unknown as import('@/types').Merchant).shop_name;
   const customerNumber = senderNumber.startsWith('91')
     ? senderNumber.substring(2)
     : senderNumber;
