@@ -23,6 +23,11 @@ export default function MerchantDetailPage() {
   
   // Modal states
   const [showActivateModal, setShowActivateModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
   
   // Activate Form
   const [planName, setPlanName] = useState<string>('growth');
@@ -179,6 +184,53 @@ export default function MerchantDetailPage() {
     }
   };
 
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess('');
+    
+    if (newPassword.length < 6) {
+      setPasswordError('Password must be at least 6 characters');
+      return;
+    }
+    
+    setPasswordLoading(true);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await fetch(`/api/admin/merchants/${merchantId}/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {})
+        },
+        body: JSON.stringify({ newPassword }),
+      });
+      
+      const resData = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(resData.error || 'Failed to reset password');
+      }
+      
+      setPasswordSuccess('Password reset successfully!');
+      setNewPassword('');
+      setTimeout(() => {
+        setShowPasswordModal(false);
+        setPasswordSuccess('');
+      }, 2000);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setPasswordError(err.message || 'Failed to reset password');
+      } else {
+        setPasswordError('Failed to reset password');
+      }
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -251,6 +303,12 @@ export default function MerchantDetailPage() {
               </div>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                onClick={() => setShowPasswordModal(true)}
+                className="btn btn-sm btn-secondary"
+              >
+                🔑 Reset Password
+              </button>
               <a
                 href={`mailto:${merchant.email}`}
                 className="btn btn-sm btn-secondary"
@@ -810,6 +868,66 @@ export default function MerchantDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Password Reset Modal */}
+      {showPasswordModal && (
+        <div className="modal-backdrop">
+          <div className="modal-content" style={{ maxWidth: '400px' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1.5rem' }}>
+              Reset Merchant Password
+            </h2>
+
+            {passwordSuccess && (
+              <div className="alert alert-success" style={{ marginBottom: '1rem' }}>
+                ✅ {passwordSuccess}
+              </div>
+            )}
+            
+            {passwordError && (
+              <div className="alert alert-error" style={{ marginBottom: '1rem' }}>
+                ⚠️ {passwordError}
+              </div>
+            )}
+
+            <form onSubmit={handleResetPassword}>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label className="label">New Password</label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="Enter new password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  minLength={6}
+                  required
+                />
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
+                  This will immediately change the merchant's password. They will not be notified by email.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowPasswordModal(false)}
+                  disabled={passwordLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={passwordLoading}
+                >
+                  {passwordLoading ? 'Resetting...' : 'Reset Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
