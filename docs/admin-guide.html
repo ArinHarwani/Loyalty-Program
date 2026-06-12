@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LoyaltyQR — Admin Operations Manual</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    
+    :root {
+      --primary: #6366f1;
+      --primary-dark: #4f46e5;
+      --green: #10b981;
+      --green-dark: #059669;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --bg: #ffffff;
+      --bg-soft: #f8fafc;
+      --bg-dark: #1e1b3a;
+      --text: #1e293b;
+      --text-secondary: #64748b;
+      --border: #e2e8f0;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      color: var(--text);
+      line-height: 1.7;
+      background: var(--bg);
+    }
+
+    .cover {
+      background: linear-gradient(135deg, #1e1b3a 0%, #4f46e5 50%, #6366f1 100%);
+      color: white;
+      text-align: center;
+      padding: 6rem 2rem;
+      margin-bottom: 3rem;
+    }
+    .cover h1 { font-size: 2.75rem; font-weight: 800; margin-bottom: 0.5rem; }
+    .cover .subtitle { font-size: 1.2rem; opacity: 0.9; margin-bottom: 0.5rem; }
+    .cover .tag { display: inline-block; background: rgba(255,255,255,0.15); padding: 0.3rem 1rem; border-radius: 20px; font-size: 0.85rem; margin-top: 0.5rem; }
+    .cover .version { font-size: 0.85rem; opacity: 0.6; margin-top: 1rem; }
+
+    .container { max-width: 850px; margin: 0 auto; padding: 0 2rem 4rem; }
+
+    h2 {
+      font-size: 1.65rem;
+      font-weight: 800;
+      margin-top: 3rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 3px solid var(--primary);
+      color: var(--primary-dark);
+    }
+    h3 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+    }
+    h4 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin-top: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    p { margin-bottom: 1rem; color: var(--text-secondary); }
+    ul, ol { margin-bottom: 1rem; padding-left: 1.5rem; color: var(--text-secondary); }
+    li { margin-bottom: 0.4rem; }
+    code {
+      background: #f1f5f9;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.9em;
+      color: var(--primary-dark);
+      font-family: 'Courier New', monospace;
+    }
+    pre {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 1rem 1.25rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 0.85rem;
+      margin: 1rem 0 1.5rem;
+      line-height: 1.5;
+    }
+
+    .toc { margin: 2rem 0 3rem; }
+    .toc a {
+      display: block;
+      padding: 0.45rem 0;
+      color: var(--primary-dark);
+      text-decoration: none;
+      border-bottom: 1px solid var(--border);
+      font-weight: 500;
+      font-size: 0.95rem;
+    }
+    .toc a:hover { color: var(--danger); }
+
+    .info-box {
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      margin: 1.5rem 0;
+    }
+    .info-box h4 { margin-top: 0; }
+    .info-box.green { background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.25); }
+    .info-box.green h4 { color: var(--green-dark); }
+    .info-box.purple { background: rgba(99,102,241,0.06); border: 1px solid rgba(99,102,241,0.25); }
+    .info-box.purple h4 { color: var(--primary-dark); }
+    .info-box.yellow { background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.25); }
+    .info-box.yellow h4 { color: #b45309; }
+    .info-box.red { background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.25); }
+    .info-box.red h4 { color: #dc2626; }
+
+    .step-box {
+      background: var(--bg-soft);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1rem;
+      border-left: 4px solid var(--primary);
+    }
+    .step-box .step-num {
+      display: inline-block;
+      background: var(--primary);
+      color: white;
+      width: 26px; height: 26px;
+      line-height: 26px;
+      text-align: center;
+      border-radius: 50%;
+      font-weight: 700;
+      font-size: 0.8rem;
+      margin-right: 0.6rem;
+    }
+    .step-box .step-title { font-weight: 700; color: var(--text); }
+    .step-box p { margin-top: 0.5rem; margin-bottom: 0; font-size: 0.95rem; }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0 1.5rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      font-size: 0.95rem;
+    }
+    table.data-table th {
+      background: var(--primary);
+      color: white;
+      padding: 0.6rem 0.75rem;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    table.data-table td {
+      padding: 0.6rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+    table.data-table tr:nth-child(even) { background: var(--bg-soft); }
+    table.data-table td:first-child { font-weight: 600; color: var(--text); }
+
+    .footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+      margin-top: 3rem;
+    }
+
+    @media print {
+      .cover { padding: 3rem 2rem; }
+      .step-box, .info-box { break-inside: avoid; }
+      h2 { break-before: page; }
+      pre { white-space: pre-wrap; word-wrap: break-word; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ==================== COVER ==================== -->
+<div class="cover">
+  <h1>LoyaltyQR</h1>
+  <p class="subtitle">Admin Operations Manual</p>
+  <div class="tag">🔒 CONFIDENTIAL — Admin Use Only</div>
+  <p class="version">Version 1.0 • June 2026</p>
+</div>
+
+<div class="container">
+
+<!-- ==================== TOC ==================== -->
+<h2 id="toc" style="margin-top: 0;">📑 Table of Contents</h2>
+<div class="toc">
+  <a href="#architecture">1. System Architecture Overview</a>
+  <a href="#tech-stack">2. Tech Stack & Infrastructure</a>
+  <a href="#env-vars">3. Environment Variables & Secrets</a>
+  <a href="#database">4. Database Schema</a>
+  <a href="#pricing">5. Pricing & Plans (Exact Numbers)</a>
+  <a href="#admin-dashboard">6. Admin Dashboard — Full Guide</a>
+  <a href="#merchant-lifecycle">7. Merchant Lifecycle Management</a>
+  <a href="#activate">8. How to Activate a New Merchant</a>
+  <a href="#reset-password">9. How to Reset a Merchant's Password</a>
+  <a href="#block-unblock">10. How to Block / Unblock a Merchant</a>
+  <a href="#whatsapp">11. WhatsApp Integration — Templates & Costs</a>
+  <a href="#cron-jobs">12. Automated Cron Jobs</a>
+  <a href="#customer-quota">13. Customer Quota & Upgrades</a>
+  <a href="#delete-merchant">14. How to Delete a Merchant</a>
+  <a href="#supabase">15. Supabase Admin Tasks</a>
+  <a href="#vercel">16. Vercel Deployment</a>
+  <a href="#billing">17. Monthly Billing Checklist</a>
+  <a href="#troubleshooting">18. Troubleshooting Guide</a>
+  <a href="#urls">19. Important URLs & Credentials</a>
+  <a href="#file-structure">20. Codebase File Structure</a>
+</div>
+
+<!-- ==================== SECTION 1 ==================== -->
+<h2 id="architecture">1. 🏗️ System Architecture Overview</h2>
+<p>LoyaltyQR is a <strong>full-stack web application</strong> that connects merchants, their customers, and WhatsApp together. Here's how the pieces fit:</p>
+
+<div class="info-box purple">
+  <h4>Flow Summary</h4>
+  <ol>
+    <li><strong>Merchant</strong> logs into the web app → creates a campaign → enters a bill amount → generates a QR code</li>
+    <li><strong>Customer</strong> scans QR → enters WhatsApp number → confirms on WhatsApp</li>
+    <li><strong>Backend</strong> records the transaction → calculates progress → sends WhatsApp message via Meta API</li>
+    <li><strong>Admin (you)</strong> manages everything from the admin dashboard — activate/block merchants, view analytics, reset passwords</li>
+  </ol>
+</div>
+
+<!-- ==================== SECTION 2 ==================== -->
+<h2 id="tech-stack">2. 🛠️ Tech Stack & Infrastructure</h2>
+
+<table class="data-table">
+  <thead>
+    <tr><th>Component</th><th>Technology</th><th>Purpose</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Frontend</td><td>Next.js 16.2.6 (React)</td><td>All UI pages — merchant dashboard, admin, customer scan</td></tr>
+    <tr><td>Backend</td><td>Next.js API Routes</td><td>All server-side logic, API endpoints</td></tr>
+    <tr><td>Database</td><td>Supabase (PostgreSQL)</td><td>All data — merchants, customers, transactions, messages</td></tr>
+    <tr><td>Auth</td><td>Supabase Auth</td><td>Merchant login/signup, session management</td></tr>
+    <tr><td>Messaging</td><td>Meta WhatsApp Business API</td><td>Sending all WhatsApp messages to customers</td></tr>
+    <tr><td>Hosting</td><td>Vercel</td><td>Web app hosting, serverless functions, cron jobs</td></tr>
+    <tr><td>DNS/Domain</td><td>Vercel</td><td>Custom domain management</td></tr>
+  </tbody>
+</table>
+
+<!-- ==================== SECTION 3 ==================== -->
+<h2 id="env-vars">3. 🔐 Environment Variables & Secrets</h2>
+<p>These are the secret keys stored in Vercel. <strong>Never share these publicly.</strong></p>
+
+<table class="data-table">
+  <thead>
+    <tr><th>Variable</th><th>What It Does</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>NEXT_PUBLIC_SUPABASE_URL</td><td>Your Supabase project URL</td></tr>
+    <tr><td>NEXT_PUBLIC_SUPABASE_ANON_KEY</td><td>Public (anon) Supabase key for client-side auth</td></tr>
+    <tr><td>SUPABASE_SERVICE_ROLE_KEY</td><td>Secret key that bypasses all security (used by server APIs only)</td></tr>
+    <tr><td>WHATSAPP_TOKEN</td><td>Meta WhatsApp Business API access token</td></tr>
+    <tr><td>WHATSAPP_PHONE_NUMBER_ID</td><td>Your WhatsApp Business phone number ID</td></tr>
+    <tr><td>WHATSAPP_VERIFY_TOKEN</td><td>Secret token for Meta webhook verification</td></tr>
+    <tr><td>WHATSAPP_BUSINESS_NUMBER</td><td>Your actual WhatsApp number (e.g., 919660610690)</td></tr>
+    <tr><td>ADMIN_EMAIL</td><td>Admin email: <code>loyaltyqr@gmail.com</code></td></tr>
+    <tr><td>CRON_SECRET</td><td>Secret key for cron job endpoints (prevents unauthorized calls)</td></tr>
+  </tbody>
+</table>
+
+<div class="info-box red">
+  <h4>⚠️ CRITICAL: WhatsApp Token Expiration</h4>
+  <p>The <code>WHATSAPP_TOKEN</code> from Meta expires periodically. If WhatsApp messages stop sending, check if the token needs renewal in the Meta Business Suite → WhatsApp → API Setup. Update it in Vercel → Settings → Environment Variables.</p>
+</div>
+
+<!-- ==================== SECTION 4 ==================== -->
+<h2 id="database">4. 🗄️ Database Schema</h2>
+<p>Here are all the tables in your Supabase database and what they store:</p>
+
+<table class="data-table">
+  <thead>
+    <tr><th>Table</th><th>What It Stores</th><th>Key Columns</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>merchants</td><td>Shop owners who sign up</td><td>id, email, shop_name, shop_category, subscription_status, subscription_plan, customer_limit, subscription_end_date</td></tr>
+    <tr><td>customers</td><td>End consumers (identified by WhatsApp number)</td><td>id, whatsapp_number, name, birth_month, birth_day</td></tr>
+    <tr><td>campaigns</td><td>Loyalty campaigns created by merchants</td><td>id, merchant_id, campaign_type (amount/visits), target_amount, target_visits, duration_days, reward_description, status</td></tr>
+    <tr><td>enrollments</td><td>Customer → Campaign participation</td><td>id, customer_id, campaign_id, merchant_id, total_spent, total_visits, deadline_at, status, claim_code, claimed</td></tr>
+    <tr><td>transactions</td><td>Individual purchase/return records</td><td>id, enrollment_id, merchant_id, amount, scanned_at, qr_token</td></tr>
+    <tr><td>qr_tokens</td><td>Generated QR codes (expire after 3 min)</td><td>token, merchant_id, campaign_id, amount, expires_at, used</td></tr>
+    <tr><td>subscriptions</td><td>Payment & plan activation records</td><td>id, merchant_id, plan_name, price, duration_months, start_date, end_date, status, payment_method, utr_number</td></tr>
+    <tr><td>message_logs</td><td>Every WhatsApp message sent/failed</td><td>id, merchant_id, customer_id, template_name, category, cost, status</td></tr>
+    <tr><td>merchant_packages</td><td>Historical package assignments</td><td>id, merchant_id, package_name, price, started_at, ended_at</td></tr>
+    <tr><td>merchant_status_log</td><td>Status change audit trail</td><td>id, merchant_id, status, changed_at, reason</td></tr>
+  </tbody>
+</table>
+
+<!-- ==================== SECTION 5 ==================== -->
+<h2 id="pricing">5. 💰 Pricing & Plans (Exact Numbers)</h2>
+
+<table class="data-table">
+  <thead>
+    <tr><th>Plan</th><th>Monthly Price</th><th>Customer Limit</th><th>Est. WhatsApp Cost/mo</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Growth</td><td>₹999</td><td>1,000</td><td>~₹187</td></tr>
+    <tr><td>Business</td><td>₹1,499</td><td>2,000</td><td>~₹374</td></tr>
+    <tr><td>Pro</td><td>₹2,999</td><td>5,000</td><td>~₹935</td></tr>
+    <tr><td>Custom</td><td>You decide</td><td>You set manually</td><td>Varies</td></tr>
+  </tbody>
+</table>
+
+<h3>Multi-Month Discounts</h3>
+<table class="data-table">
+  <thead>
+    <tr><th>Duration</th><th>Discount %</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1 month</td><td>0% (no discount)</td></tr>
+    <tr><td>2 months</td><td>10%</td></tr>
+    <tr><td>3 months</td><td>15%</td></tr>
+    <tr><td>6 months</td><td>20%</td></tr>
+  </tbody>
+</table>
+
+<h3>WhatsApp Message Costs</h3>
+<table class="data-table">
+  <thead>
+    <tr><th>Category</th><th>Cost per Message (INR)</th><th>Used For</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Service</td><td>₹0.00 (free)</td><td>Progress updates, welcome, completion — sent within 24-hour window</td></tr>
+    <tr><td>Utility</td><td>₹0.115</td><td>3-day expiry warning (account_update template)</td></tr>
+    <tr><td>Marketing</td><td>₹0.8631</td><td>Birthday wishes (birthday template)</td></tr>
+  </tbody>
+</table>
+
+<!-- ==================== SECTION 6 ==================== -->
+<h2 id="admin-dashboard">6. 🖥️ Admin Dashboard — Full Guide</h2>
+<p>Access the admin dashboard at <code>/admin</code>. Login with <code>loyaltyqr@gmail.com</code>.</p>
+
+<h3>What You See</h3>
+
+<h4>Top Stats Row</h4>
+<ul>
+  <li><strong>Total Merchants</strong> — everyone who signed up</li>
+  <li><strong>Active Merchants</strong> — with active subscription</li>
+  <li><strong>Total Customers</strong> — all end consumers across all merchants</li>
+  <li><strong>Total Transactions</strong> — all scans processed</li>
+  <li><strong>Revenue MTD</strong> — money collected this month from merchants</li>
+  <li><strong>WhatsApp Cost MTD</strong> — total WhatsApp message cost this month</li>
+  <li><strong>Margin MTD</strong> — Revenue minus WhatsApp costs</li>
+  <li><strong>MRR</strong> — Monthly Recurring Revenue (projected)</li>
+</ul>
+
+<h4>Subscription Health Pie Chart</h4>
+<p>Shows active vs inactive vs blocked merchants visually.</p>
+
+<h4>Expiring Soon</h4>
+<p>Lists merchants whose subscriptions expire in the next 7 days. <strong>This is your reminder to contact them for renewal.</strong></p>
+
+<h4>Churn Risks</h4>
+<p>Lists merchants who haven't logged in recently or have low activity — potential churn candidates.</p>
+
+<h4>Monthly Revenue Chart</h4>
+<p>Bar chart showing revenue, costs, and margin trends over the past months.</p>
+
+<h4>Merchant List</h4>
+<p>Full table of all merchants with their status, plan, customers, transactions, and WhatsApp costs. Click on any merchant to see their detailed page.</p>
+
+<h3>Admin Analytics Page (/admin/analytics)</h3>
+<p>Access from the "Analytics" button at the top of the admin dashboard. Shows deeper platform-wide metrics and cost breakdowns (service/utility/marketing).</p>
+
+<!-- ==================== SECTION 7 ==================== -->
+<h2 id="merchant-lifecycle">7. 🔄 Merchant Lifecycle Management</h2>
+
+<div class="info-box green">
+  <h4>Merchant Status Flow</h4>
+  <p>
+    <code>Signup</code> → <strong>inactive</strong> (pending your approval) → You <strong>activate</strong> → <strong>active</strong> → Subscription expires → <strong>inactive</strong> again<br><br>
+    At any point you can <strong>block</strong> a merchant (status becomes <strong>blocked</strong>) and later <strong>unblock</strong> them.
+  </p>
+</div>
+
+<table class="data-table">
+  <thead>
+    <tr><th>Status</th><th>What Happens</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>inactive</td><td>Merchant sees "Pending Activation" page. Cannot use the app. Waiting for you to activate.</td></tr>
+    <tr><td>active</td><td>Full access to dashboard, campaigns, transactions. Customers can scan QR codes.</td></tr>
+    <tr><td>blocked</td><td>Merchant sees "Account Suspended" page. Cannot do anything. Use for non-payment or violations.</td></tr>
+  </tbody>
+</table>
+
+<!-- ==================== SECTION 8 ==================== -->
+<h2 id="activate">8. ✅ How to Activate a New Merchant</h2>
+<p>When a merchant signs up and completes onboarding, they appear in your admin dashboard with status <strong>"inactive"</strong>.</p>
+
+<div class="step-box">
+  <span class="step-num">1</span><span class="step-title">Go to Admin Dashboard → click on the merchant</span>
+  <p>Find them in the merchant list and click their row to open their detail page.</p>
+</div>
+<div class="step-box">
+  <span class="step-num">2</span><span class="step-title">Click "Activate / Renew" button</span>
+  <p>This opens the Activation Modal.</p>
+</div>
+<div class="step-box">
+  <span class="step-num">3</span><span class="step-title">Fill in the activation form</span>
+  <p>
+    • <strong>Plan:</strong> Select Growth / Business / Pro / Custom<br>
+    • <strong>Duration:</strong> 1 / 2 / 3 / 6 months<br>
+    • <strong>Custom Price:</strong> (Optional) Override the calculated price<br>
+    • <strong>Custom Customer Limit:</strong> (Optional) Override plan default<br>
+    • <strong>Payment Method:</strong> UPI / Cash / Bank Transfer / Other<br>
+    • <strong>UTR Number:</strong> (Optional) Transaction reference<br>
+    • <strong>Notes:</strong> (Optional) Any internal notes<br>
+    • <strong>Start Date:</strong> Auto-calculated (today, or day after current subscription ends)<br>
+    • <strong>End Date Override:</strong> (Optional) Manually set an end date instead of auto-calculating
+  </p>
+</div>
+<div class="step-box">
+  <span class="step-num">4</span><span class="step-title">Click "Activate"</span>
+  <p>The system will set the merchant's status to "active", assign their customer limit, set the subscription dates, and log the payment in subscription history.</p>
+</div>
+
+<div class="info-box yellow">
+  <h4>💡 Quota Exhaustion Mid-Month</h4>
+  <p>If a merchant exhausts their customer quota in the middle of the month and wants more customers, they need to pay for a new plan. Use the activation modal again — the start date will auto-set to the day after their current subscription ends. Set the <strong>End Date Override</strong> to match their original end date if you want both plans to expire together.</p>
+</div>
+
+<!-- ==================== SECTION 9 ==================== -->
+<h2 id="reset-password">9. 🔑 How to Reset a Merchant's Password</h2>
+<p>If a merchant forgets their password and contacts you:</p>
+
+<div class="step-box">
+  <span class="step-num">1</span><span class="step-title">Go to Admin Dashboard → click on the merchant</span>
+</div>
+<div class="step-box">
+  <span class="step-num">2</span><span class="step-title">Click "🔑 Reset Password" button</span>
+  <p>This is in the top-right area of the merchant header, next to the Email button.</p>
+</div>
+<div class="step-box">
+  <span class="step-num">3</span><span class="step-title">Enter a new password (minimum 6 characters)</span>
+  <p>Type a new password for them. This is a plain-text field so you can see what you're typing.</p>
+</div>
+<div class="step-box">
+  <span class="step-num">4</span><span class="step-title">Click "Reset Password"</span>
+  <p>The password is changed immediately. The merchant is NOT notified by email — you need to tell them the new password yourself (via WhatsApp/call).</p>
+</div>
+
+<!-- ==================== SECTION 10 ==================== -->
+<h2 id="block-unblock">10. 🚫 How to Block / Unblock a Merchant</h2>
+
+<h3>Blocking</h3>
+<p>On the merchant detail page, scroll to <strong>Subscription Management</strong> section and click <strong>"Block Merchant"</strong>. This immediately:</p>
+<ul>
+  <li>Sets their status to "blocked"</li>
+  <li>They see a "Account Suspended" page when they try to log in</li>
+  <li>Their WhatsApp messages (birthday, expiry warnings) stop being sent</li>
+  <li>Customers can no longer scan QR codes</li>
+</ul>
+
+<h3>Unblocking</h3>
+<p>Click <strong>"Unblock Merchant"</strong> on the same page. This restores their status to the previous state (usually "inactive" — you may need to activate them again).</p>
+
+<!-- ==================== SECTION 11 ==================== -->
+<h2 id="whatsapp">11. 💬 WhatsApp Integration — Templates & Costs</h2>
+
+<h3>Approved Meta Templates</h3>
+
+<table class="data-table">
+  <thead>
+    <tr><th>Template Name</th><th>Category</th><th>Variables</th><th>Cost</th><th>When Sent</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>birthday</td>
+      <td>Marketing</td>
+      <td>{{1}} = customer name<br>{{2}} = shop name (appears twice)</td>
+      <td>₹0.8631</td>
+      <td>Daily at 9 AM IST on customer birthdays</td>
+    </tr>
+    <tr>
+      <td>account_update</td>
+      <td>Utility</td>
+      <td>{{1}} = shop name<br>Button: "Check Status"</td>
+      <td>₹0.115</td>
+      <td>3 days before enrollment deadline</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Regular Text Messages (Not Templates)</h3>
+<p>These are sent as free-form text within the 24-hour conversation window (service messages, ₹0.00 cost):</p>
+<ul>
+  <li><strong>Welcome message</strong> — when customer first joins</li>
+  <li><strong>Progress update</strong> — after every transaction</li>
+  <li><strong>Completion + claim code</strong> — when goal is reached</li>
+  <li><strong>Status check reply</strong> — when customer replies with "STATUS" or similar keyword</li>
+</ul>
+
+<div class="info-box red">
+  <h4>⚠️ Important: 24-Hour Window Rule</h4>
+  <p>WhatsApp allows free-form text messages only <strong>within 24 hours of the customer's last interaction</strong>. This is why our system sends progress updates immediately after a scan (within the window). The birthday and expiry templates work outside this window because they are Meta-approved templates.</p>
+</div>
+
+<!-- ==================== SECTION 12 ==================== -->
+<h2 id="cron-jobs">12. ⏰ Automated Cron Jobs</h2>
+<p>These run automatically on Vercel's cron scheduler. You don't need to do anything — they run by themselves.</p>
+
+<table class="data-table">
+  <thead>
+    <tr><th>Cron Job</th><th>Schedule</th><th>What It Does</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>/api/cron/expire</td>
+      <td>Daily at 1:00 AM IST (19:30 UTC)</td>
+      <td>1. Marks past-deadline enrollments as "expired"<br>2. Sends 3-day warning via <code>account_update</code> template to customers nearing deadline</td>
+    </tr>
+    <tr>
+      <td>/api/cron/birthday</td>
+      <td>Daily at 9:00 AM IST (3:30 UTC)</td>
+      <td>Finds customers whose birthday is today and sends the <code>birthday</code> template from each active merchant they're enrolled with</td>
+    </tr>
+    <tr>
+      <td>/api/cron/cleanup</td>
+      <td>Manual (not scheduled)</td>
+      <td>Deletes expired QR tokens older than 7 days and message logs older than 6 months. Run manually when needed.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="info-box green">
+  <h4>💡 How to manually run a cron job</h4>
+  <p>Open your browser and visit the URL with the auth header. Or use this curl command:<br>
+  <code>curl -H "Authorization: Bearer YOUR_CRON_SECRET" https://yourdomain.com/api/cron/cleanup</code></p>
+</div>
+
+<!-- ==================== SECTION 13 ==================== -->
+<h2 id="customer-quota">13. 👥 Customer Quota & Upgrades</h2>
+
+<h3>How Quota Works</h3>
+<ul>
+  <li>Each plan has a <strong>customer limit</strong> (Growth = 1000, Business = 2000, Pro = 5000)</li>
+  <li>The count is based on <strong>unique customers</strong> (distinct WhatsApp numbers enrolled with that merchant)</li>
+  <li>At <strong>80%</strong> usage, the merchant sees a yellow warning banner on their dashboard</li>
+  <li>At <strong>100%</strong>, new customer scans will fail with an error</li>
+</ul>
+
+<h3>When a Merchant Requests More Quota</h3>
+<div class="step-box">
+  <span class="step-num">1</span><span class="step-title">They contact you (WhatsApp/phone)</span>
+  <p>"My customer limit is full, I want to add more customers."</p>
+</div>
+<div class="step-box">
+  <span class="step-num">2</span><span class="step-title">You decide the pricing</span>
+  <p>They pay the <strong>full plan price again</strong> (e.g., ₹999 for another 1000 customers on Growth). This is NOT a top-up — it's a new subscription block.</p>
+</div>
+<div class="step-box">
+  <span class="step-num">3</span><span class="step-title">Open their merchant detail page → click "Activate / Renew"</span>
+  <p>Select their plan, set the amount they paid. <strong>Important:</strong> Set the <strong>End Date Override</strong> to their existing subscription end date so both plan periods align.</p>
+</div>
+
+<!-- ==================== SECTION 14 ==================== -->
+<h2 id="delete-merchant">14. 🗑️ How to Delete a Merchant</h2>
+
+<div class="info-box yellow">
+  <h4>⚠️ Pre-requisite: Run the Cascade Delete Migration</h4>
+  <p>Before you can delete a merchant from the Supabase Table Editor, you need to have run the <code>migration-v6-cascade-delete.sql</code> migration. This changes the foreign keys so that deleting a merchant automatically deletes all their related data (enrollments, transactions, QR tokens, message logs).</p>
+</div>
+
+<div class="step-box">
+  <span class="step-num">1</span><span class="step-title">Go to Supabase Dashboard → SQL Editor</span>
+  <p>If you haven't already, paste and run the contents of <code>supabase/migration-v6-cascade-delete.sql</code>.</p>
+</div>
+<div class="step-box">
+  <span class="step-num">2</span><span class="step-title">Go to Supabase → Table Editor → merchants</span>
+  <p>Find the merchant row, click the checkbox, and click Delete.</p>
+</div>
+<div class="step-box">
+  <span class="step-num">3</span><span class="step-title">Also delete their Auth user</span>
+  <p>Go to Supabase → Authentication → Users → find their email → click the three dots → Delete User.</p>
+</div>
+
+<!-- ==================== SECTION 15 ==================== -->
+<h2 id="supabase">15. 🟢 Supabase Admin Tasks</h2>
+
+<h3>Accessing the Dashboard</h3>
+<p>Go to <a href="https://supabase.com/dashboard">supabase.com/dashboard</a> and log in with your account.</p>
+
+<h3>Common SQL Queries</h3>
+
+<h4>View all active merchants</h4>
+<pre>SELECT id, shop_name, email, subscription_plan, subscription_end_date, customer_limit
+FROM merchants
+WHERE subscription_status = 'active'
+ORDER BY created_at DESC;</pre>
+
+<h4>Check a merchant's total customers</h4>
+<pre>SELECT COUNT(DISTINCT customer_id) as total_customers
+FROM enrollments
+WHERE merchant_id = 'PASTE-MERCHANT-ID-HERE';</pre>
+
+<h4>Delete old QR tokens manually</h4>
+<pre>DELETE FROM qr_tokens
+WHERE created_at < NOW() - INTERVAL '7 days';</pre>
+
+<h4>Delete old message logs manually</h4>
+<pre>DELETE FROM message_logs
+WHERE created_at < NOW() - INTERVAL '6 months';</pre>
+
+<h4>View WhatsApp costs for a merchant this month</h4>
+<pre>SELECT template_name, category, COUNT(*) as count, SUM(cost) as total_cost
+FROM message_logs
+WHERE merchant_id = 'PASTE-MERCHANT-ID-HERE'
+  AND sent_at >= DATE_TRUNC('month', NOW())
+GROUP BY template_name, category;</pre>
+
+<!-- ==================== SECTION 16 ==================== -->
+<h2 id="vercel">16. ▲ Vercel Deployment</h2>
+
+<h3>How Deployment Works</h3>
+<p>Every time you push code to the <code>main</code> branch on GitHub, Vercel automatically builds and deploys the new version. No manual action needed.</p>
+
+<h3>Checking Deployment Status</h3>
+<ol>
+  <li>Go to <a href="https://vercel.com/dashboard">vercel.com/dashboard</a></li>
+  <li>Click on the LoyaltyQR project</li>
+  <li>Check the latest deployment — green checkmark means success, red means failed</li>
+  <li>Click on a deployment to see build logs</li>
+</ol>
+
+<h3>Updating Environment Variables</h3>
+<ol>
+  <li>Go to Vercel Dashboard → Your Project → Settings → Environment Variables</li>
+  <li>Edit the variable value</li>
+  <li>Click Save</li>
+  <li><strong>Important:</strong> You must <strong>Redeploy</strong> for changes to take effect. Go to Deployments → click the three dots on the latest deployment → Redeploy.</li>
+</ol>
+
+<!-- ==================== SECTION 17 ==================== -->
+<h2 id="billing">17. 📋 Monthly Billing Checklist</h2>
+<p>Run through this checklist at the start of every month:</p>
+
+<div class="step-box">
+  <span class="step-num">1</span><span class="step-title">Check "Expiring Soon" on admin dashboard</span>
+  <p>Contact these merchants 3-5 days before expiry to remind them to renew.</p>
+</div>
+<div class="step-box">
+  <span class="step-num">2</span><span class="step-title">Review "Churn Risks"</span>
+  <p>Merchants who haven't logged in for a while — call them to check if everything is okay.</p>
+</div>
+<div class="step-box">
+  <span class="step-num">3</span><span class="step-title">Check WhatsApp costs</span>
+  <p>Go to Admin Dashboard → each merchant detail page → WhatsApp Costs section. Make sure costs are within expected range.</p>
+</div>
+<div class="step-box">
+  <span class="step-num">4</span><span class="step-title">Verify Meta WhatsApp credit balance</span>
+  <p>Go to Meta Business Suite → WhatsApp → check your prepaid balance. Top up if needed.</p>
+</div>
+<div class="step-box">
+  <span class="step-num">5</span><span class="step-title">Process any pending activations</span>
+  <p>Check if any new merchants signed up and are waiting in "inactive" status.</p>
+</div>
+
+<!-- ==================== SECTION 18 ==================== -->
+<h2 id="troubleshooting">18. 🔧 Troubleshooting Guide</h2>
+
+<h4>❌ "WhatsApp messages are not being sent"</h4>
+<ul>
+  <li>Check if <code>WHATSAPP_TOKEN</code> has expired (Meta tokens expire). Regenerate in Meta Business Suite and update in Vercel env vars. Redeploy.</li>
+  <li>Check if Meta WhatsApp credit balance is zero. Top up.</li>
+  <li>Check Vercel function logs for error messages.</li>
+</ul>
+
+<h4>❌ "Customer says QR code shows error"</h4>
+<ul>
+  <li>QR codes expire after 3 minutes. Generate a new one.</li>
+  <li>Check if the merchant's subscription is active.</li>
+  <li>Check if the merchant has hit their customer limit.</li>
+</ul>
+
+<h4>❌ "Vercel deployment is failing"</h4>
+<ul>
+  <li>Check the build logs on Vercel dashboard for the specific error.</li>
+  <li>Common issue: TypeScript errors. Run <code>npm run build</code> locally to see the error.</li>
+  <li>Common issue: Corrupted <code>package-lock.json</code>. Run <code>npm install --package-lock-only</code> and push.</li>
+</ul>
+
+<h4>❌ "Merchant can't log in"</h4>
+<ul>
+  <li>Check if their account exists in Supabase → Authentication → Users.</li>
+  <li>Reset their password from the admin merchant detail page (🔑 button).</li>
+  <li>Check if they are "blocked" — unblock them if needed.</li>
+</ul>
+
+<h4>❌ "Birthday messages not sending"</h4>
+<ul>
+  <li>Verify the cron job is running in Vercel (check Vercel Dashboard → Crons).</li>
+  <li>Verify the <code>CRON_SECRET</code> env var matches.</li>
+  <li>Check if the customer has birth_month and birth_day set in the database.</li>
+  <li>Check if the merchant is "active" — birthdays only send for active merchants.</li>
+</ul>
+
+<h4>❌ "Can't delete a merchant row in Supabase"</h4>
+<ul>
+  <li>Run the cascade delete migration: <code>supabase/migration-v6-cascade-delete.sql</code>.</li>
+  <li>This adds ON DELETE CASCADE so deleting a merchant automatically cleans up related data.</li>
+</ul>
+
+<!-- ==================== SECTION 19 ==================== -->
+<h2 id="urls">19. 🔗 Important URLs & Credentials</h2>
+
+<table class="data-table">
+  <thead>
+    <tr><th>What</th><th>URL / Info</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Live Website</td><td>Your Vercel domain (check Vercel dashboard)</td></tr>
+    <tr><td>Admin Dashboard</td><td><code>/admin</code> (login with loyaltyqr@gmail.com)</td></tr>
+    <tr><td>Merchant Login</td><td><code>/merchant/login</code></td></tr>
+    <tr><td>GitHub Repository</td><td><a href="https://github.com/ArinHarwani/Loyalty-Program">github.com/ArinHarwani/Loyalty-Program</a></td></tr>
+    <tr><td>Supabase Dashboard</td><td><a href="https://supabase.com/dashboard">supabase.com/dashboard</a></td></tr>
+    <tr><td>Vercel Dashboard</td><td><a href="https://vercel.com/dashboard">vercel.com/dashboard</a></td></tr>
+    <tr><td>Meta Business Suite</td><td><a href="https://business.facebook.com">business.facebook.com</a></td></tr>
+    <tr><td>Support WhatsApp</td><td>+91 96606 10690</td></tr>
+    <tr><td>Support Email</td><td>loyaltyqr@gmail.com</td></tr>
+  </tbody>
+</table>
+
+<!-- ==================== SECTION 20 ==================== -->
+<h2 id="file-structure">20. 📁 Codebase File Structure</h2>
+
+<pre>loyaltyqr/
+├── app/
+│   ├── page.tsx                    # Landing page (public homepage)
+│   ├── layout.tsx                  # Root layout
+│   ├── globals.css                 # All CSS styles
+│   ├── admin/
+│   │   ├── page.tsx                # Admin dashboard
+│   │   ├── analytics/page.tsx      # Admin analytics
+│   │   └── merchants/[merchantId]/ # Per-merchant detail page
+│   ├── merchant/
+│   │   ├── login/page.tsx          # Merchant login
+│   │   ├── signup/page.tsx         # Merchant signup
+│   │   ├── onboarding/page.tsx     # Shop setup (after signup)
+│   │   ├── pending/page.tsx        # "Waiting for activation" page
+│   │   ├── suspended/page.tsx      # "Account blocked" page
+│   │   ├── dashboard/page.tsx      # Main merchant dashboard
+│   │   ├── transaction/page.tsx    # New transaction + QR generation
+│   │   ├── campaign/new/page.tsx   # Create new campaign
+│   │   ├── analytics/page.tsx      # Merchant analytics
+│   │   └── settings/page.tsx       # Password change & account info
+│   ├── scan/[token]/page.tsx       # Customer-facing scan page
+│   ├── api/
+│   │   ├── admin/                  # All admin API endpoints
+│   │   ├── merchant/               # All merchant API endpoints
+│   │   ├── scan/                   # QR validation & registration
+│   │   ├── whatsapp/webhook/       # WhatsApp incoming message handler
+│   │   └── cron/                   # Scheduled jobs (expire, birthday, cleanup)
+│   ├── privacy/                    # Privacy policy page
+│   ├── terms/                      # Terms of use page
+│   ├── contact/                    # Contact page
+│   └── data-deletion/              # Data deletion info page
+├── lib/
+│   ├── supabase.ts                 # Supabase client (browser + service role)
+│   ├── whatsapp.ts                 # WhatsApp API functions & message templates
+│   ├── scan-logic.ts               # Core scan/transaction processing logic
+│   ├── utils.ts                    # Utility functions (formatting, calculations)
+│   ├── plans.ts                    # Pricing plans & discount calculations
+│   └── constants.ts                # Global constants (support number, email)
+├── types/
+│   └── index.ts                    # All TypeScript type definitions
+├── supabase/
+│   ├── migration.sql               # Original database schema
+│   ├── migration-v2.sql            # Added subscriptions & packages
+│   ├── migration-v5.sql            # Latest schema additions
+│   └── migration-v6-cascade-delete.sql  # Cascade delete fix
+├── middleware.ts                    # Auth redirect middleware
+├── vercel.json                     # Vercel config (cron schedules)
+├── package.json                    # Dependencies
+└── docs/
+    ├── merchant-guide.html         # This merchant manual
+    └── admin-guide.html            # This admin guide
+</pre>
+
+<div class="footer">
+  <p>© 2026 LoyaltyQR — Admin Operations Manual<br>
+  <strong>CONFIDENTIAL</strong> — For internal use only.<br>
+  Last updated: June 2026</p>
+</div>
+
+</div>
+</body>
+</html>

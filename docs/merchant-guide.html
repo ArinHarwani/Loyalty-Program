@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LoyaltyQR — Merchant Guide & Product Manual</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    
+    :root {
+      --primary: #10b981;
+      --primary-dark: #059669;
+      --accent: #6366f1;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --bg: #ffffff;
+      --bg-soft: #f8fafc;
+      --text: #1e293b;
+      --text-secondary: #64748b;
+      --border: #e2e8f0;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      color: var(--text);
+      line-height: 1.7;
+      background: var(--bg);
+    }
+
+    .cover {
+      background: linear-gradient(135deg, #059669 0%, #10b981 40%, #6366f1 100%);
+      color: white;
+      text-align: center;
+      padding: 6rem 2rem;
+      margin-bottom: 3rem;
+    }
+    .cover h1 { font-size: 3rem; font-weight: 800; margin-bottom: 0.5rem; }
+    .cover .subtitle { font-size: 1.25rem; opacity: 0.9; margin-bottom: 1rem; }
+    .cover .version { font-size: 0.9rem; opacity: 0.7; }
+
+    .container { max-width: 800px; margin: 0 auto; padding: 0 2rem 4rem; }
+
+    h2 {
+      font-size: 1.75rem;
+      font-weight: 800;
+      margin-top: 3rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 3px solid var(--primary);
+      color: var(--primary-dark);
+    }
+    h3 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+      color: var(--text);
+    }
+    h4 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin-top: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    p { margin-bottom: 1rem; color: var(--text-secondary); }
+    
+    ul, ol { margin-bottom: 1rem; padding-left: 1.5rem; color: var(--text-secondary); }
+    li { margin-bottom: 0.4rem; }
+
+    .step-box {
+      background: var(--bg-soft);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+      border-left: 4px solid var(--primary);
+    }
+    .step-box .step-num {
+      display: inline-block;
+      background: var(--primary);
+      color: white;
+      width: 28px;
+      height: 28px;
+      line-height: 28px;
+      text-align: center;
+      border-radius: 50%;
+      font-weight: 700;
+      font-size: 0.85rem;
+      margin-right: 0.75rem;
+    }
+    .step-box .step-title { font-weight: 700; color: var(--text); font-size: 1.05rem; }
+    .step-box p { margin-top: 0.5rem; margin-bottom: 0; font-size: 0.95rem; }
+
+    .pricing-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .pricing-table th {
+      background: var(--primary);
+      color: white;
+      padding: 0.75rem 1rem;
+      text-align: left;
+      font-weight: 600;
+    }
+    .pricing-table td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+    .pricing-table tr:nth-child(even) { background: var(--bg-soft); }
+    .pricing-table .plan-name { font-weight: 700; color: var(--text); }
+
+    .highlight-box {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(99, 102, 241, 0.05));
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+    }
+    .highlight-box h4 { margin-top: 0; color: var(--primary-dark); }
+
+    .warning-box {
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+    }
+    .warning-box h4 { margin-top: 0; color: #b45309; }
+
+    .toc { margin: 2rem 0 3rem; }
+    .toc a {
+      display: block;
+      padding: 0.5rem 0;
+      color: var(--primary-dark);
+      text-decoration: none;
+      border-bottom: 1px solid var(--border);
+      font-weight: 500;
+    }
+    .toc a:hover { color: var(--accent); }
+
+    .emoji-feature {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+      margin-bottom: 1.25rem;
+    }
+    .emoji-feature .emoji { font-size: 1.5rem; flex-shrink: 0; margin-top: 0.1rem; }
+    .emoji-feature .content h4 { margin-top: 0; }
+    .emoji-feature .content p { margin-bottom: 0; font-size: 0.95rem; }
+
+    .footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+      margin-top: 3rem;
+    }
+
+    @media print {
+      .cover { padding: 4rem 2rem; }
+      .step-box, .highlight-box, .warning-box { break-inside: avoid; }
+      h2 { break-before: page; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ==================== COVER ==================== -->
+<div class="cover">
+  <h1>LoyaltyQR</h1>
+  <p class="subtitle">Merchant Guide & Product Manual</p>
+  <p class="version">Version 1.0 • June 2026</p>
+</div>
+
+<div class="container">
+
+<!-- ==================== TABLE OF CONTENTS ==================== -->
+<h2 id="toc" style="margin-top: 0;">📑 Table of Contents</h2>
+<div class="toc">
+  <a href="#what-is">1. What is LoyaltyQR?</a>
+  <a href="#how-it-works">2. How It Works — The Big Picture</a>
+  <a href="#getting-started">3. Getting Started (Step by Step)</a>
+  <a href="#pricing">4. Pricing Plans</a>
+  <a href="#dashboard">5. Your Merchant Dashboard</a>
+  <a href="#campaigns">6. Creating & Managing Campaigns</a>
+  <a href="#transactions">7. Processing Transactions</a>
+  <a href="#customer-experience">8. What Your Customers See</a>
+  <a href="#whatsapp">9. WhatsApp Messages</a>
+  <a href="#analytics">10. Analytics & Reports</a>
+  <a href="#settings">11. Account Settings</a>
+  <a href="#faq">12. Frequently Asked Questions</a>
+  <a href="#support">13. Need Help?</a>
+</div>
+
+<!-- ==================== SECTION 1 ==================== -->
+<h2 id="what-is">1. 🌟 What is LoyaltyQR?</h2>
+<p>LoyaltyQR is a <strong>WhatsApp-based loyalty program</strong> built specifically for Indian retail shops. Instead of expensive apps or printed punch cards, LoyaltyQR lets you run loyalty campaigns where your customers earn rewards through their WhatsApp — the app they already use every day.</p>
+
+<div class="highlight-box">
+  <h4>💡 Why LoyaltyQR?</h4>
+  <ul>
+    <li><strong>No app download needed</strong> — customers use WhatsApp, which they already have</li>
+    <li><strong>QR-code based</strong> — simple, fast, and works offline on printed QR</li>
+    <li><strong>Automated messages</strong> — progress updates, birthday wishes, expiry reminders</li>
+    <li><strong>Works for any shop</strong> — restaurants, sweet shops, salons, clothing stores, and more</li>
+  </ul>
+</div>
+
+<!-- ==================== SECTION 2 ==================== -->
+<h2 id="how-it-works">2. 🔄 How It Works — The Big Picture</h2>
+
+<div class="emoji-feature">
+  <span class="emoji">1️⃣</span>
+  <div class="content">
+    <h4>You Create a Campaign</h4>
+    <p>Set a goal (e.g., "Spend ₹5,000 in 30 days") and a reward (e.g., "Get 10% off next purchase").</p>
+  </div>
+</div>
+
+<div class="emoji-feature">
+  <span class="emoji">2️⃣</span>
+  <div class="content">
+    <h4>Customer Makes a Purchase</h4>
+    <p>You enter the bill amount in LoyaltyQR and a QR code appears on your phone screen.</p>
+  </div>
+</div>
+
+<div class="emoji-feature">
+  <span class="emoji">3️⃣</span>
+  <div class="content">
+    <h4>Customer Scans the QR</h4>
+    <p>The customer scans the QR from their phone, enters their WhatsApp number (only once), and taps "Confirm on WhatsApp".</p>
+  </div>
+</div>
+
+<div class="emoji-feature">
+  <span class="emoji">4️⃣</span>
+  <div class="content">
+    <h4>Automatic WhatsApp Update</h4>
+    <p>The customer instantly receives a WhatsApp message showing their progress: how much they've spent, how close they are to the reward, and how many days are left.</p>
+  </div>
+</div>
+
+<div class="emoji-feature">
+  <span class="emoji">5️⃣</span>
+  <div class="content">
+    <h4>Reward Claimed!</h4>
+    <p>When the customer reaches the goal, they get a unique claim code on WhatsApp. They show you the code, you verify it, and give the reward.</p>
+  </div>
+</div>
+
+<!-- ==================== SECTION 3 ==================== -->
+<h2 id="getting-started">3. 🚀 Getting Started (Step by Step)</h2>
+
+<h3>Step A: Sign Up</h3>
+<div class="step-box">
+  <span class="step-num">1</span><span class="step-title">Open the website</span>
+  <p>Go to the LoyaltyQR website and click <strong>"Get Started Free"</strong> or <strong>"Merchant Login"</strong> in the top right.</p>
+</div>
+<div class="step-box">
+  <span class="step-num">2</span><span class="step-title">Create your account</span>
+  <p>Click <strong>"Sign Up"</strong>, enter your email address and a password (minimum 6 characters). Click <strong>"Sign Up"</strong>.</p>
+</div>
+<div class="step-box">
+  <span class="step-num">3</span><span class="step-title">Set up your shop</span>
+  <p>On the next screen, enter your <strong>Shop Name</strong> (e.g., "Sharma Sweets") and select your <strong>Category</strong> from the dropdown (Sweet Shop, Restaurant, Cafe, Salon, Clothing Store, etc.). Click <strong>"Create My Shop"</strong>.</p>
+</div>
+<div class="step-box">
+  <span class="step-num">4</span><span class="step-title">Wait for activation</span>
+  <p>You will see a <strong>"Pending Activation"</strong> screen. The LoyaltyQR team will review your details and activate your account within 24 hours. You will receive confirmation via email/WhatsApp.</p>
+</div>
+
+<h3>Step B: Create Your First Campaign</h3>
+<div class="step-box">
+  <span class="step-num">1</span><span class="step-title">Go to your Dashboard</span>
+  <p>Once activated, log in and you'll see your dashboard. Click <strong>"+ Create Campaign"</strong>.</p>
+</div>
+<div class="step-box">
+  <span class="step-num">2</span><span class="step-title">Choose campaign type</span>
+  <p><strong>Spend & Win (Amount-based):</strong> Customer must spend a certain amount (e.g., ₹5,000) within a time period.<br>
+  <strong>Visit & Win (Visit-based):</strong> Customer must visit a certain number of times (e.g., 10 visits) within a time period.</p>
+</div>
+<div class="step-box">
+  <span class="step-num">3</span><span class="step-title">Set the details</span>
+  <p>
+    • <strong>Campaign Name:</strong> e.g., "Summer Special"<br>
+    • <strong>Target:</strong> Amount (₹5,000) or Visits (10 visits)<br>
+    • <strong>Duration:</strong> Choose preset (15, 30, 45, 60 days) or pick a specific end date<br>
+    • <strong>Reward:</strong> e.g., "10% off next purchase" or "Free mithai box"<br>
+    • <strong>Max Winners:</strong> (Optional) Limit how many people can win
+  </p>
+</div>
+<div class="step-box">
+  <span class="step-num">4</span><span class="step-title">Launch!</span>
+  <p>Review the preview card showing exactly how customers will see your campaign, then click <strong>"Create Campaign"</strong>.</p>
+</div>
+
+<h3>Step C: Start Processing Transactions</h3>
+<div class="step-box">
+  <span class="step-num">1</span><span class="step-title">Click "New Transaction" on your dashboard</span>
+  <p>This is the big green button at the top of your dashboard.</p>
+</div>
+<div class="step-box">
+  <span class="step-num">2</span><span class="step-title">Enter the bill amount</span>
+  <p>Type the customer's bill amount (for amount campaigns) or just click to log a visit.</p>
+</div>
+<div class="step-box">
+  <span class="step-num">3</span><span class="step-title">Show QR to customer</span>
+  <p>A QR code will appear on your screen. Show it to the customer. They scan it with their phone camera.</p>
+</div>
+<div class="step-box">
+  <span class="step-num">4</span><span class="step-title">Customer confirms on WhatsApp</span>
+  <p>The customer enters their WhatsApp number (first time only — it remembers them afterwards!), taps confirm, and the transaction is logged automatically.</p>
+</div>
+
+<!-- ==================== SECTION 4 ==================== -->
+<h2 id="pricing">4. 💰 Pricing Plans</h2>
+<p>LoyaltyQR offers three simple plans based on how many loyalty customers you want to track:</p>
+
+<table class="pricing-table">
+  <thead>
+    <tr>
+      <th>Plan</th>
+      <th>Price (Monthly)</th>
+      <th>Customer Limit</th>
+      <th>Best For</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="plan-name">🟢 Growth</td>
+      <td><strong>₹999/month</strong></td>
+      <td>Up to 1,000 customers</td>
+      <td>Small shops, new businesses</td>
+    </tr>
+    <tr>
+      <td class="plan-name">🔵 Business</td>
+      <td><strong>₹1,499/month</strong></td>
+      <td>Up to 2,000 customers</td>
+      <td>Growing businesses</td>
+    </tr>
+    <tr>
+      <td class="plan-name">🔴 Pro</td>
+      <td><strong>₹2,999/month</strong></td>
+      <td>Up to 5,000 customers</td>
+      <td>Large shops, chains</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Multi-Month Discounts</h3>
+<p>Save more by subscribing for longer periods:</p>
+<table class="pricing-table">
+  <thead>
+    <tr>
+      <th>Duration</th>
+      <th>Discount</th>
+      <th>Example (Growth Plan)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1 month</td>
+      <td>No discount</td>
+      <td>₹999</td>
+    </tr>
+    <tr>
+      <td>2 months</td>
+      <td><strong>10% off</strong></td>
+      <td>₹1,798 (save ₹200)</td>
+    </tr>
+    <tr>
+      <td>3 months</td>
+      <td><strong>15% off</strong></td>
+      <td>₹2,547 (save ₹450)</td>
+    </tr>
+    <tr>
+      <td>6 months</td>
+      <td><strong>20% off</strong></td>
+      <td>₹4,795 (save ₹1,199)</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="warning-box">
+  <h4>⚠️ What happens when customer limit is reached?</h4>
+  <p>When you reach 80% of your customer limit, you'll see a warning banner on your dashboard. Once you hit 100%, new customers will see an error when trying to scan. To add more customers, contact us via WhatsApp to upgrade your plan.</p>
+</div>
+
+<!-- ==================== SECTION 5 ==================== -->
+<h2 id="dashboard">5. 📊 Your Merchant Dashboard</h2>
+<p>After logging in, your dashboard shows you everything at a glance:</p>
+
+<div class="emoji-feature">
+  <span class="emoji">📋</span>
+  <div class="content">
+    <h4>Plan Info Card</h4>
+    <p>Shows your current plan name, customer usage (progress bar), and subscription end date.</p>
+  </div>
+</div>
+
+<div class="emoji-feature">
+  <span class="emoji">💳</span>
+  <div class="content">
+    <h4>New Transaction Button</h4>
+    <p>The main action button to start processing a customer transaction. Always visible at the top.</p>
+  </div>
+</div>
+
+<div class="emoji-feature">
+  <span class="emoji">🎯</span>
+  <div class="content">
+    <h4>Active Campaign Card</h4>
+    <p>Shows your current campaign name, number of customers, completions, and the target/reward.</p>
+  </div>
+</div>
+
+<div class="emoji-feature">
+  <span class="emoji">🏆</span>
+  <div class="content">
+    <h4>Winners Pending Claim</h4>
+    <p>Shows customers who completed the campaign and are waiting to claim their reward. Click "Mark Claimed" once you give them the reward.</p>
+  </div>
+</div>
+
+<div class="emoji-feature">
+  <span class="emoji">👥</span>
+  <div class="content">
+    <h4>Customer Progress</h4>
+    <p>Lists all enrolled customers with their progress bars, showing how close each one is to the goal.</p>
+  </div>
+</div>
+
+<h3>Navigation</h3>
+<p>From the dashboard navigation bar, you can access:</p>
+<ul>
+  <li><strong>📊 Analytics</strong> — Detailed charts and campaign performance</li>
+  <li><strong>⚙️ Settings</strong> — Account info and password change</li>
+  <li><strong>Logout</strong> — Sign out of your account</li>
+</ul>
+
+<!-- ==================== SECTION 6 ==================== -->
+<h2 id="campaigns">6. 🎯 Creating & Managing Campaigns</h2>
+
+<h3>Campaign Types</h3>
+
+<div class="highlight-box">
+  <h4>💰 Spend & Win (Amount-Based)</h4>
+  <p>Customers accumulate their total spending. Perfect for shops where order values vary — like sweet shops, restaurants, clothing stores.</p>
+  <p><strong>Example:</strong> "Spend ₹5,000 in 30 days → Get a free box of sweets"</p>
+</div>
+
+<div class="highlight-box">
+  <h4>🏃 Visit & Win (Visit-Based)</h4>
+  <p>Customers accumulate visit count. Perfect for businesses with fixed services — like salons, cafes, juice stalls.</p>
+  <p><strong>Example:</strong> "Visit 10 times in 60 days → Get a free haircut"</p>
+</div>
+
+<h3>Campaign Duration Options</h3>
+<ul>
+  <li><strong>Preset durations:</strong> 15, 30, 45, or 60 days</li>
+  <li><strong>Specific end date:</strong> Pick an exact calendar date (e.g., Diwali, New Year)</li>
+</ul>
+
+<h3>Ending a Campaign</h3>
+<p>You can end an active campaign at any time from the Analytics page. When you end a campaign, all active enrollments are marked as expired, and you can create a new campaign immediately.</p>
+
+<!-- ==================== SECTION 7 ==================== -->
+<h2 id="transactions">7. 💳 Processing Transactions</h2>
+
+<h3>Making a Sale (Purchase)</h3>
+<ol>
+  <li>Open <strong>"New Transaction"</strong> from your dashboard</li>
+  <li>Make sure <strong>"+ Purchase"</strong> is selected (green toggle)</li>
+  <li>Enter the bill amount (for amount campaigns)</li>
+  <li>Click <strong>"Generate QR Code"</strong></li>
+  <li>Show the QR to the customer — they scan it with their phone</li>
+  <li>Wait for the screen to show <strong>"Transaction Recorded!"</strong></li>
+</ol>
+
+<h3>Processing a Return / Refund</h3>
+<ol>
+  <li>Open <strong>"New Transaction"</strong></li>
+  <li>Switch to <strong>"− Return"</strong> (red toggle)</li>
+  <li>Enter the refund amount</li>
+  <li>Click <strong>"Generate Return QR"</strong></li>
+  <li>The QR will appear in red — customer scans it</li>
+  <li>The refund amount is subtracted from their running total</li>
+</ol>
+
+<div class="warning-box">
+  <h4>⏱ QR Code Expiry</h4>
+  <p>Every QR code expires in <strong>3 minutes</strong> (180 seconds). If not scanned in time, it becomes invalid and you need to generate a new one. This is a security feature to prevent reuse.</p>
+</div>
+
+<h3>Claiming Rewards</h3>
+<p>When a customer completes the goal, they receive a <strong>unique claim code</strong> on WhatsApp (e.g., "ABC1234"). They will come to your shop and show you the code. Go to your dashboard → <strong>"Winners Pending Claim"</strong> section → find their phone number and verify the code → click <strong>"Mark Claimed"</strong>.</p>
+
+<!-- ==================== SECTION 8 ==================== -->
+<h2 id="customer-experience">8. 📱 What Your Customers See</h2>
+<p>When a customer scans the QR code from their phone, they see a clean, simple page with:</p>
+<ol>
+  <li><strong>Your shop name and category</strong></li>
+  <li><strong>Campaign details</strong> — goal description and reward</li>
+  <li><strong>Transaction amount</strong> being added</li>
+  <li><strong>WhatsApp number input</strong> (only for first-time customers)</li>
+  <li><strong>Countdown timer</strong> — showing how long until the QR expires</li>
+</ol>
+
+<div class="highlight-box">
+  <h4>🔁 Returning Customers</h4>
+  <p>If the customer has scanned before at your shop, the system <strong>automatically remembers</strong> their WhatsApp number. They see a "Welcome back!" message and are auto-confirmed within 3 seconds — no typing needed!</p>
+</div>
+
+<p>After confirming, the customer is redirected to WhatsApp where they tap "Send" to complete the process. They then receive their progress update automatically.</p>
+
+<!-- ==================== SECTION 9 ==================== -->
+<h2 id="whatsapp">9. 💬 WhatsApp Messages</h2>
+<p>LoyaltyQR sends the following automated WhatsApp messages to your customers:</p>
+
+<div class="emoji-feature">
+  <span class="emoji">👋</span>
+  <div class="content">
+    <h4>Welcome Message</h4>
+    <p>Sent when a customer joins your loyalty program for the first time. Includes shop name, campaign goal, reward, deadline, and first progress update.</p>
+  </div>
+</div>
+
+<div class="emoji-feature">
+  <span class="emoji">📊</span>
+  <div class="content">
+    <h4>Progress Update</h4>
+    <p>Sent after every transaction. Shows the amount/visit added, total progress, and days remaining.</p>
+  </div>
+</div>
+
+<div class="emoji-feature">
+  <span class="emoji">🏆</span>
+  <div class="content">
+    <h4>Completion Message</h4>
+    <p>Sent when the customer reaches the goal. Includes the reward description and a unique claim code.</p>
+  </div>
+</div>
+
+<div class="emoji-feature">
+  <span class="emoji">⏰</span>
+  <div class="content">
+    <h4>3-Day Expiry Warning</h4>
+    <p>Sent automatically 3 days before a customer's enrollment expires. Reminds them to visit soon. Includes a "Check Status" button.</p>
+  </div>
+</div>
+
+<div class="emoji-feature">
+  <span class="emoji">🎂</span>
+  <div class="content">
+    <h4>Birthday Wishes</h4>
+    <p>If the customer shared their birthday during signup, they automatically receive a personalised birthday message from your shop every year!</p>
+  </div>
+</div>
+
+<!-- ==================== SECTION 10 ==================== -->
+<h2 id="analytics">10. 📊 Analytics & Reports</h2>
+<p>The Analytics page (accessible from your dashboard navigation) shows you:</p>
+<ul>
+  <li><strong>Total customers enrolled</strong> in the current campaign</li>
+  <li><strong>Completion rate</strong> — percentage of customers who reached the goal</li>
+  <li><strong>Total revenue tracked</strong> through the campaign</li>
+  <li><strong>Customer funnel</strong> — visual breakdown of customer journey stages</li>
+  <li><strong>Daily transaction charts</strong> — see which days are busiest</li>
+  <li><strong>Peak hours</strong> — know when your customers shop the most</li>
+  <li><strong>Campaign comparison</strong> — compare multiple campaigns side by side</li>
+  <li><strong>Winners list</strong> — claimed vs unclaimed rewards</li>
+</ul>
+
+<!-- ==================== SECTION 11 ==================== -->
+<h2 id="settings">11. ⚙️ Account Settings</h2>
+<p>Access Settings from the navigation bar on your dashboard. The Settings page shows:</p>
+
+<h3>Account Information</h3>
+<ul>
+  <li>Your email address</li>
+  <li>Your current plan name</li>
+  <li>Customer usage (current / limit)</li>
+  <li>Subscription end date</li>
+</ul>
+
+<h3>Changing Your Password</h3>
+<p>If you want to change your password, you'll see a message: <strong>"Please contact the LoyaltyQR team for password changes."</strong> This is for security — contact us via WhatsApp or email and we'll reset it for you within minutes.</p>
+
+<!-- ==================== SECTION 12 ==================== -->
+<h2 id="faq">12. ❓ Frequently Asked Questions</h2>
+
+<h4>Q: Do my customers need to download any app?</h4>
+<p><strong>No!</strong> Customers only need WhatsApp, which they already have. They scan a QR code from their phone camera and everything happens through WhatsApp.</p>
+
+<h4>Q: What happens when a customer's campaign deadline passes?</h4>
+<p>Their enrollment is automatically marked as "expired". They can start fresh if you have an active campaign — they just need to scan the QR again.</p>
+
+<h4>Q: Can I run multiple campaigns at the same time?</h4>
+<p>Currently, you can have one active campaign at a time. End the current one before creating a new one.</p>
+
+<h4>Q: What if a customer asks for a refund?</h4>
+<p>Use the <strong>"Return"</strong> toggle on the New Transaction page. This subtracts the refund amount from the customer's running total.</p>
+
+<h4>Q: What happens if my subscription expires?</h4>
+<p>Your data is safe. Customers can't scan new QR codes, but all existing data remains. Contact us to renew.</p>
+
+<h4>Q: Can I upgrade my plan mid-month?</h4>
+<p>Yes! Contact the LoyaltyQR team and we'll upgrade your plan immediately. You'll get the new customer limit right away.</p>
+
+<h4>Q: Is the customer data safe?</h4>
+<p>Yes. All data is stored securely using Supabase (a Google Firebase-level platform). Only you and the LoyaltyQR admin can see your customer data.</p>
+
+<!-- ==================== SECTION 13 ==================== -->
+<h2 id="support">13. 📞 Need Help?</h2>
+<div class="highlight-box">
+  <h4>Contact LoyaltyQR Support</h4>
+  <p>
+    📱 <strong>WhatsApp:</strong> <a href="https://wa.me/919660610690">+91 96606 10690</a><br>
+    📧 <strong>Email:</strong> <a href="mailto:loyaltyqr@gmail.com">loyaltyqr@gmail.com</a>
+  </p>
+  <p>We're available Monday to Saturday, 10 AM to 7 PM IST. Response time: within 2 hours.</p>
+</div>
+
+<div class="footer">
+  <p>© 2026 LoyaltyQR. All rights reserved.<br>Built for Indian businesses with ❤️</p>
+</div>
+
+</div>
+</body>
+</html>
