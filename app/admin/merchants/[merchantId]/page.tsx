@@ -902,7 +902,7 @@ export default function MerchantDetailPage() {
                   required
                 />
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
-                  This will immediately change the merchant's password. They will not be notified by email.
+                  This will immediately change the merchant&apos;s password. They will not be notified by email.
                 </p>
               </div>
 

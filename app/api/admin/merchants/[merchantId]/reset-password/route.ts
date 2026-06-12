@@ -1,30 +1,35 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { createClient as createServerClient } from '@/lib/supabase-server';
+// ============================================================
+// Admin — Reset Merchant Password API
+// ============================================================
 
-// Need to use service role key to bypass RLS and change auth users
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { NextRequest, NextResponse } from 'next/server';
+import { createServiceClient } from '@/lib/supabase';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
 export async function POST(
-  request: Request,
-  { params }: { params: { merchantId: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ merchantId: string }> }
 ) {
   try {
-    const supabase = createServerClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() { return cookieStore.getAll(); },
+          setAll() {},
+        },
+      }
+    );
 
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Verify admin
-    if (session.user.email !== 'loyaltyqr@gmail.com') {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.email || user.email !== process.env.ADMIN_EMAIL) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    const { merchantId } = await params;
     const body = await request.json();
     const { newPassword } = body;
 
@@ -35,11 +40,14 @@ export async function POST(
       );
     }
 
-    // 1. Get the auth user id linked to this merchant
+    // Use service role client to update auth user password
+    const supabaseAdmin = createServiceClient();
+
+    // Verify merchant exists
     const { data: merchantData, error: merchantError } = await supabaseAdmin
       .from('merchants')
       .select('id, email')
-      .eq('id', params.merchantId)
+      .eq('id', merchantId)
       .single();
 
     if (merchantError || !merchantData) {
@@ -48,7 +56,7 @@ export async function POST(
 
     // Update the password in auth.users
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-      params.merchantId,
+      merchantId,
       { password: newPassword }
     );
 

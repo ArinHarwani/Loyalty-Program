@@ -395,11 +395,11 @@ export async function handleStatusCheck(
   let progressText = '';
 
   if (campaign.campaign_type === 'amount') {
-    const percentageDone = calcPercentage(enrollment.total_spent, campaign.target_amount);
-    progressText = `₹${Number(enrollment.total_spent).toLocaleString('en-IN')} / ₹${Number(campaign.target_amount).toLocaleString('en-IN')} (${percentageDone}%)`;
+    const percentageDone = calcPercentage(enrollment.total_spent, campaign.target_amount ?? 0);
+    progressText = `₹${Number(enrollment.total_spent).toLocaleString('en-IN')} / ₹${Number(campaign.target_amount ?? 0).toLocaleString('en-IN')} (${percentageDone}%)`;
   } else {
-    const percentageDone = calcPercentage(enrollment.total_visits, campaign.target_visits);
-    progressText = `${enrollment.total_visits} / ${campaign.target_visits} visits (${percentageDone}%)`;
+    const percentageDone = calcPercentage(enrollment.total_visits, campaign.target_visits ?? 0);
+    progressText = `${enrollment.total_visits} / ${campaign.target_visits ?? 0} visits (${percentageDone}%)`;
   }
 
   // Build reply message
