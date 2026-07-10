@@ -30,8 +30,8 @@ export default function ContactPage() {
               <div>
                 <div style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Phone & WhatsApp</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.25rem' }}>
-                  <a href="tel:+918239110690" style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none', fontSize: '1.1rem' }}>+91 8239110690 (Arin)</a>
-                  <a href="tel:+917878733804" style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none', fontSize: '1.1rem' }}>+91 7878733804 (Harshit)</a>
+                  <a href="tel:+918239110690" style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none', fontSize: '1.1rem' }}>+91 8239110690</a>
+                  <a href="tel:+917878733804" style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none', fontSize: '1.1rem' }}>+91 7878733804</a>
                 </div>
               </div>
             </div>

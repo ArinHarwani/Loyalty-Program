@@ -12,6 +12,8 @@ export async function POST(
   { params }: { params: Promise<{ merchantId: string }> }
 ) {
   try {
+    // Auth check — support both cookie session and Authorization header
+    const authHeader = request.headers.get('authorization');
     const cookieStore = await cookies();
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,6 +23,9 @@ export async function POST(
           getAll() { return cookieStore.getAll(); },
           setAll() {},
         },
+        global: authHeader
+          ? { headers: { Authorization: authHeader } }
+          : {},
       }
     );
 

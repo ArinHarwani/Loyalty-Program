@@ -122,9 +122,11 @@ export async function POST(request: NextRequest) {
       await processJoin(merchantCode, senderNumber, customerNumber, supabase);
     }
     // ===================== TXN FLOW =====================
-    else if (messageText.toUpperCase().startsWith('TXN-')) {
-      // IMPORTANT: preserve original case of the token!
-      const txnToken = messageText.substring(4).trim();
+    // Match TXN token from anywhere in the message (supports new pre-fill text format)
+    else if (messageText.toUpperCase().includes('TXN-')) {
+      // Extract the actual token preserving original case
+      const txnMatch = messageText.match(/TXN-([A-Za-z0-9_-]+)/i);
+      const txnToken = txnMatch?.[1]?.trim();
       if (!txnToken) {
         await sendWhatsAppMessage(senderNumber, 'Invalid transaction code.');
         return NextResponse.json({ status: 'ok' }, { status: 200 });

@@ -385,7 +385,7 @@ export default function ScanPage() {
 
                   {/* Name */}
                   <div style={{ marginBottom: '1rem' }}>
-                    <label className="label" htmlFor="name-input">Your Name (optional)</label>
+                    <label className="label" htmlFor="name-input">Your Name *</label>
                     <input
                       type="text"
                       className="input"
@@ -394,6 +394,7 @@ export default function ScanPage() {
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
                       maxLength={60}
+                      required
                     />
                   </div>
 
