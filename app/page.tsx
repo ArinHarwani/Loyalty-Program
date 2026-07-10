@@ -287,9 +287,11 @@ export default function LandingPage() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.9rem' }}>
               {[
-                'QR transactions',
+                'Digital Ledger & QR',
                 'WhatsApp updates',
-                'Basic analytics',
+                'Expiry reminders',
+                'Broadcast messaging',
+                'Analytics Dashboard',
               ].map(f => (
                 <div key={f} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--muted)' }}>
                   <span>✓</span> {f}
@@ -311,9 +313,11 @@ export default function LandingPage() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.9rem' }}>
               {[
-                'Everything in Basic',
-                'Advanced analytics',
+                'Digital Ledger & QR',
+                'WhatsApp updates',
                 'Expiry reminders',
+                'Broadcast messaging',
+                'Analytics Dashboard',
               ].map(f => (
                 <div key={f} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--charcoal)', fontWeight: 500 }}>
                   <span>✓</span> {f}
@@ -334,9 +338,11 @@ export default function LandingPage() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.9rem' }}>
               {[
-                'Everything in Business',
+                'Digital Ledger & QR',
+                'WhatsApp updates',
+                'Expiry reminders',
                 'Broadcast messaging',
-                'Priority support',
+                'Analytics Dashboard',
               ].map(f => (
                 <div key={f} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--muted)' }}>
                   <span>✓</span> {f}
