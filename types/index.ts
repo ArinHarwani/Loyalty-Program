@@ -17,6 +17,7 @@ export interface Merchant {
   subscription_end_date: string | null;
   subscription_plan: string | null;
   customer_limit: number | null;
+  loyalty_mechanism: 'milestone' | 'points';
   last_login_at: string | null;
   notes: string | null;
   created_at: string;
@@ -30,6 +31,8 @@ export interface Campaign {
   target_amount: number | null;
   target_visits: number | null;
   duration_days: number;
+  window_mode?: 'fixed' | 'rolling';
+  window_duration_days?: number | null;
   end_date: string | null;
   reward_description: string;
   max_winners: number | null;
@@ -59,6 +62,7 @@ export interface Enrollment {
   claim_code: string | null;
   claimed: boolean;
   warning_sent: boolean;
+  config_snapshot?: Record<string, unknown> | null;
 }
 
 export interface Transaction {
@@ -73,7 +77,7 @@ export interface Transaction {
 export interface QrToken {
   token: string;
   merchant_id: string;
-  campaign_id: string;
+  campaign_id: string | null;
   amount: number;
   created_at: string;
   expires_at: string;
@@ -122,6 +126,34 @@ export interface Subscription {
   payment_method: string;
   utr_number: string | null;
   notes: string | null;
+  created_at: string;
+}
+
+export interface PointsConfig {
+  id: string;
+  merchant_id: string;
+  cashback_percentage: number;
+  conversion_rate: number;
+  min_bill_amount: number;
+  min_redeem_points: number;
+  expiry_months: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PointsLedgerEntry {
+  id: string;
+  merchant_id: string;
+  customer_id: string;
+  type: 'earn' | 'redeem' | 'adjust';
+  points: number;
+  bill_amount: number | null;
+  cashback_pct_at_time: number | null;
+  conversion_rate_at_time: number | null;
+  balance_after: number;
+  qr_token: string | null;
+  notes: string | null;
+  warning_sent: boolean;
   created_at: string;
 }
 

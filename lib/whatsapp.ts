@@ -184,3 +184,57 @@ Come visit us soon — we'd love to celebrate with you! 🎁
 With lots of love,
 Team ${shopName} 💚`;
 }
+
+// --- Digital Points Message Composers ---
+
+export function composePointsWelcomeMessage(
+  customerName: string,
+  shopName: string,
+  pointsEarned: number,
+  totalBalance: number,
+  cashbackPct: number
+): string {
+  const greeting = customerName ? `Hi ${customerName}! 👋` : 'Hi there! 👋';
+  return `${greeting}
+
+🎉 Welcome to ${shopName}'s points program!
+
+You earn ${cashbackPct}% cashback as points on every purchase.
+
+✨ +${pointsEarned} points earned!
+Balance: ${totalBalance} points
+
+Keep shopping to earn more! 🛍️`;
+}
+
+export function composePointsEarnMessage(
+  customerName: string,
+  shopName: string,
+  pointsEarned: number,
+  totalBalance: number
+): string {
+  const greeting = customerName ? `Hi ${customerName}!` : 'Hey!';
+  return `${greeting} ${shopName} Points Update 💎
+
+✨ +${pointsEarned} points earned!
+Balance: ${totalBalance} points
+
+Redeem your points at the shop anytime! 🎁`;
+}
+
+export function composePointsRedeemMessage(
+  customerName: string,
+  shopName: string,
+  pointsRedeemed: number,
+  currencyValue: number,
+  newBalance: number
+): string {
+  const greeting = customerName ? `Hi ${customerName}!` : 'Hey!';
+  return `${greeting} ${shopName} — Points Redeemed ✅
+
+🎁 ${pointsRedeemed} points redeemed
+Discount: ₹${currencyValue}
+Remaining balance: ${newBalance} points
+
+Thank you for being a loyal customer! 💚`;
+}

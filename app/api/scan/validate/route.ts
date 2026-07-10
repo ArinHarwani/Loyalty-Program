@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
         merchant: qrToken.merchant ? {
           id: qrToken.merchant.id,
           shop_name: qrToken.merchant.shop_name,
+          loyalty_mechanism: qrToken.merchant.loyalty_mechanism,
         } : null,
         campaign: qrToken.campaign ? {
           id: qrToken.campaign.id,

@@ -1,12 +1,14 @@
 // ============================================================
 // WhatsApp Webhook — handles incoming messages from Meta
-// Transaction processing is done inline here (no scan-logic dependency).
+// Branches between Milestone (processTransaction) and Points
+// (processPointsEarn) based on the merchant's loyalty_mechanism.
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase';
 import { sendWhatsAppMessage } from '@/lib/whatsapp';
 import { processJoin, processTransaction, handleStatusCheck } from '@/lib/scan-logic';
+import { processPointsEarn, handlePointsStatusCheck } from '@/lib/points-logic';
 import crypto from 'crypto';
 
 // GET — Meta verification challenge
@@ -79,6 +81,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: 'ok' }, { status: 200 });
     }
 
+    if (payload && payload.startsWith('POINTS-')) {
+      const parts = payload.split('-');
+      if (parts.length >= 3) {
+        const merchantId = parts[1];
+        const customerId = parts.slice(2).join('-');
+        const supabase = createServiceClient();
+        await handlePointsStatusCheck(merchantId, customerId, senderNumber, supabase);
+      }
+      return NextResponse.json({ status: 'ok' }, { status: 200 });
+    }
+
     const messageText = message.text?.body?.trim() || '';
 
     if (!messageText) {
@@ -104,13 +117,34 @@ export async function POST(request: NextRequest) {
     // ===================== TXN FLOW =====================
     else if (messageText.toUpperCase().startsWith('TXN-')) {
       // IMPORTANT: preserve original case of the token!
-      // Tokens are lowercase (base36). toUpperCase() would break the DB lookup.
       const txnToken = messageText.substring(4).trim();
       if (!txnToken) {
         await sendWhatsAppMessage(senderNumber, 'Invalid transaction code.');
         return NextResponse.json({ status: 'ok' }, { status: 200 });
       }
-      await processTransaction(txnToken, senderNumber, customerNumber, supabase);
+
+      // --- Branch on merchant's loyalty mechanism ---
+      const { data: qrToken } = await supabase
+        .from('qr_tokens')
+        .select('merchant_id')
+        .eq('token', txnToken)
+        .single();
+
+      if (qrToken) {
+        const { data: merchant } = await supabase
+          .from('merchants')
+          .select('loyalty_mechanism')
+          .eq('id', qrToken.merchant_id)
+          .single();
+
+        if (merchant?.loyalty_mechanism === 'points') {
+          await processPointsEarn(txnToken, senderNumber, customerNumber, supabase);
+        } else {
+          await processTransaction(txnToken, senderNumber, customerNumber, supabase);
+        }
+      } else {
+        await sendWhatsAppMessage(senderNumber, 'This QR is no longer valid. Please ask the shopkeeper for a new one.');
+      }
     }
     // ===================== DEFAULT HELP =====================
     else {

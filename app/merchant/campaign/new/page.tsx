@@ -23,6 +23,11 @@ export default function NewCampaignPage() {
   const [durationMode, setDurationMode] = useState<DurationMode>('preset');
   const [durationDays, setDurationDays] = useState<number>(30);
   const [endDate, setEndDate] = useState('');
+  
+  // Rolling Window States
+  const [windowMode, setWindowMode] = useState<'fixed' | 'rolling'>('fixed');
+  const [windowDurationDays, setWindowDurationDays] = useState<string>('30');
+  
   const [rewardDescription, setRewardDescription] = useState('');
   const [maxWinners, setMaxWinners] = useState('');
 
@@ -44,7 +49,7 @@ export default function NewCampaignPage() {
     ? Math.ceil((new Date(endDate).getTime() - now) / (1000 * 60 * 60 * 24))
     : durationDays;
 
-  // Format end date for preview display
+  // Format end date for preview display (only applies to fixed mode)
   const previewEndDate = durationMode === 'specific' && endDate
     ? new Date(endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
     : (() => {
@@ -74,14 +79,21 @@ export default function NewCampaignPage() {
     e.preventDefault();
     if (!merchant) return;
 
-    // Validate end date mode
-    if (durationMode === 'specific') {
+    // Validate inputs
+    if (windowMode === 'fixed' && durationMode === 'specific') {
       if (!endDate) {
         setError('Please select an offer end date.');
         return;
       }
       if (new Date(endDate) <= new Date()) {
         setError('Offer end date must be in the future.');
+        return;
+      }
+    }
+
+    if (windowMode === 'rolling') {
+      if (!windowDurationDays || Number(windowDurationDays) <= 0) {
+        setError('Please enter a valid window duration in days.');
         return;
       }
     }
@@ -99,14 +111,20 @@ export default function NewCampaignPage() {
         target_visits: campaignType === 'visits' ? Number(targetVisits) : null,
         reward_description: rewardDescription,
         max_winners: maxWinners ? Number(maxWinners) : null,
+        window_mode: windowMode,
       };
 
-      if (durationMode === 'preset') {
-        payload.duration_days = durationDays;
+      if (windowMode === 'fixed') {
+        if (durationMode === 'preset') {
+          payload.duration_days = durationDays;
+        } else {
+          payload.end_date = endDate;
+          payload.duration_days = Math.max(1, computedDurationDays);
+        }
       } else {
-        payload.end_date = endDate;
-        // Also store computed duration_days for display purposes
-        payload.duration_days = Math.max(1, computedDurationDays);
+        // rolling mode
+        payload.window_duration_days = Number(windowDurationDays);
+        payload.duration_days = Number(windowDurationDays); // fallback for legacy code
       }
 
       const { error: insertError } = await supabase.from('campaigns').insert(payload);
@@ -203,73 +221,120 @@ export default function NewCampaignPage() {
 
           {/* Offer Duration */}
           <div className="card" style={{ marginBottom: '1rem' }}>
-            <label className="label">Offer Duration</label>
+            <label className="label">Campaign Deadline Type</label>
 
-            {/* Mode switcher */}
-            <div className="toggle-group" style={{ marginBottom: '1rem' }}>
+            <div className="toggle-group" style={{ marginBottom: '1.5rem' }}>
               <button
                 type="button"
-                className={`toggle-btn ${durationMode === 'preset' ? 'active' : ''}`}
-                onClick={() => setDurationMode('preset')}
-                id="duration-preset-btn"
+                className={`toggle-btn ${windowMode === 'fixed' ? 'active' : ''}`}
+                onClick={() => setWindowMode('fixed')}
               >
-                ⏱ Quick Select
+                📅 Fixed Deadline
               </button>
               <button
                 type="button"
-                className={`toggle-btn ${durationMode === 'specific' ? 'active' : ''}`}
-                onClick={() => setDurationMode('specific')}
-                id="duration-date-btn"
+                className={`toggle-btn ${windowMode === 'rolling' ? 'active' : ''}`}
+                onClick={() => setWindowMode('rolling')}
               >
-                📅 Pick End Date
+                🔄 Rolling Window
               </button>
             </div>
 
-            {durationMode === 'preset' && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
-                {[15, 30, 45, 60].map((d) => (
+            {windowMode === 'fixed' && (
+              <>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                  All customers must complete the goal by the same end date.
+                </p>
+                {/* Mode switcher */}
+                <div className="toggle-group" style={{ marginBottom: '1rem' }}>
                   <button
-                    key={d}
                     type="button"
-                    className={`btn ${durationDays === d ? 'btn-primary' : 'btn-secondary'}`}
-                    onClick={() => setDurationDays(d)}
-                    style={{ padding: '0.75rem' }}
+                    className={`toggle-btn ${durationMode === 'preset' ? 'active' : ''}`}
+                    onClick={() => setDurationMode('preset')}
+                    id="duration-preset-btn"
                   >
-                    {d} days
+                    ⏱ Quick Select
                   </button>
-                ))}
-              </div>
+                  <button
+                    type="button"
+                    className={`toggle-btn ${durationMode === 'specific' ? 'active' : ''}`}
+                    onClick={() => setDurationMode('specific')}
+                    id="duration-date-btn"
+                  >
+                    📅 Pick End Date
+                  </button>
+                </div>
+
+                {durationMode === 'preset' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+                    {[15, 30, 45, 60].map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        className={`btn ${durationDays === d ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => setDurationDays(d)}
+                        style={{ padding: '0.75rem' }}
+                      >
+                        {d} days
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {durationMode === 'specific' && (
+                  <div>
+                    <input
+                      type="date"
+                      className="input"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      min={minDate}
+                      required={durationMode === 'specific'}
+                      id="end-date-input"
+                      style={{ cursor: 'pointer' }}
+                    />
+                    {endDate && computedDurationDays > 0 && (
+                      <p style={{
+                        color: 'var(--primary)',
+                        fontSize: '0.85rem',
+                        marginTop: '0.5rem',
+                        fontWeight: 600,
+                      }}>
+                        ✓ Offer runs for {computedDurationDays} day{computedDurationDays !== 1 ? 's' : ''} — ends {previewEndDate}
+                      </p>
+                    )}
+                    {endDate && computedDurationDays <= 0 && (
+                      <p style={{ color: '#dc2626', fontSize: '0.85rem', marginTop: '0.5rem' }}>
+                        ⚠️ End date must be in the future
+                      </p>
+                    )}
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
+                      All customers enrolling in this campaign will have until this date to complete the offer
+                    </p>
+                  </div>
+                )}
+              </>
             )}
 
-            {durationMode === 'specific' && (
+            {windowMode === 'rolling' && (
               <div>
-                <input
-                  type="date"
-                  className="input"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  min={minDate}
-                  required={durationMode === 'specific'}
-                  id="end-date-input"
-                  style={{ cursor: 'pointer' }}
-                />
-                {endDate && computedDurationDays > 0 && (
-                  <p style={{
-                    color: 'var(--primary)',
-                    fontSize: '0.85rem',
-                    marginTop: '0.5rem',
-                    fontWeight: 600,
-                  }}>
-                    ✓ Offer runs for {computedDurationDays} day{computedDurationDays !== 1 ? 's' : ''} — ends {previewEndDate}
-                  </p>
-                )}
-                {endDate && computedDurationDays <= 0 && (
-                  <p style={{ color: '#dc2626', fontSize: '0.85rem', marginTop: '0.5rem' }}>
-                    ⚠️ End date must be in the future
-                  </p>
-                )}
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                  Each customer gets their own deadline starting from their first scan.
+                </p>
+                <label className="label">Days to complete (per customer)</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input
+                    type="number"
+                    className="input"
+                    value={windowDurationDays}
+                    onChange={(e) => setWindowDurationDays(e.target.value)}
+                    min="1"
+                    required
+                  />
+                  <span>days</span>
+                </div>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
-                  All customers enrolling in this campaign will have until this date to complete the offer
+                  Example: If 30 days, a customer who first scans on Jan 1st has until Jan 31st to complete the goal. A customer who scans on Jan 10th has until Feb 9th.
                 </p>
               </div>
             )}
@@ -317,11 +382,16 @@ export default function NewCampaignPage() {
             </h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
               {campaignType === 'amount'
-                ? `Spend ${targetAmount ? formatCurrency(Number(targetAmount)) : '₹___'} in ${computedDurationDays} days`
-                : `Visit ${targetVisits || '___'} times in ${computedDurationDays} days`}
+                ? `Spend ${targetAmount ? formatCurrency(Number(targetAmount)) : '₹___'} in `
+                : `Visit ${targetVisits || '___'} times in `}
+              {windowMode === 'fixed' ? computedDurationDays : (windowDurationDays || '___')} days
             </p>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-              📅 Offer ends: <strong>{previewEndDate}</strong>
+              {windowMode === 'fixed' ? (
+                <>📅 Offer ends: <strong>{previewEndDate}</strong></>
+              ) : (
+                <>🔄 Deadline: <strong>{windowDurationDays || 'X'} days from first scan</strong></>
+              )}
             </p>
             <p style={{ fontSize: '0.9rem' }}>
               🎁 {rewardDescription || 'Reward description'}
@@ -347,7 +417,8 @@ export default function NewCampaignPage() {
               !name ||
               !rewardDescription ||
               (campaignType === 'amount' ? !targetAmount : !targetVisits) ||
-              (durationMode === 'specific' && (!endDate || computedDurationDays <= 0))
+              (windowMode === 'fixed' && durationMode === 'specific' && (!endDate || computedDurationDays <= 0)) ||
+              (windowMode === 'rolling' && (!windowDurationDays || Number(windowDurationDays) <= 0))
             }
             id="create-campaign-btn"
           >

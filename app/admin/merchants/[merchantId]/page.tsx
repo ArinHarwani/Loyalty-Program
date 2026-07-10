@@ -300,6 +300,9 @@ export default function MerchantDetailPage() {
                 <span className="badge badge-muted">
                   Joined {formatDate(merchant.created_at)}
                 </span>
+                <span className={`badge ${merchant.loyalty_mechanism === 'points' ? 'badge-info' : 'badge-primary'}`}>
+                  {merchant.loyalty_mechanism === 'points' ? '💎 Digital Points' : '🎯 Milestone Campaigns'}
+                </span>
               </div>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>

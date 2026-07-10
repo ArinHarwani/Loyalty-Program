@@ -74,12 +74,12 @@ export default function TransactionPage() {
       // Store negative amount for returns
       const storedAmount = isReturn
         ? -Math.abs(Number(amount))
-        : (campaign.campaign_type === 'visits' ? 0 : Number(amount));
+        : (campaign?.campaign_type === 'visits' ? 0 : Number(amount));
 
       const { error } = await supabase.from('qr_tokens').insert({
         token: newToken,
         merchant_id: merchant.id,
-        campaign_id: campaign.id,
+        campaign_id: campaign?.id || null, // null for points
         amount: storedAmount,
         expires_at: expiresAt,
       });
@@ -161,9 +161,11 @@ export default function TransactionPage() {
   const circumference = 2 * Math.PI * 36;
   const offset = circumference - (countdown / 180) * circumference;
 
-  if (!campaign) {
+  const isPointsMode = merchant?.loyalty_mechanism === 'points';
+
+  if (!isPointsMode && !campaign) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
+      <div style={{ minHeight: '100vh', background: 'var(--paper)' }}>
         <nav className="nav">
           <Link href="/merchant/dashboard" className="nav-brand">← Back</Link>
         </nav>
@@ -184,10 +186,10 @@ export default function TransactionPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--paper)' }}>
       <nav className="nav">
         <Link href="/merchant/dashboard" className="nav-brand">← Back</Link>
-        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+        <span style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>
           {merchant?.shop_name}
         </span>
       </nav>
@@ -201,22 +203,23 @@ export default function TransactionPage() {
                 {isReturn ? 'Process Return' : 'New Transaction'}
               </h1>
               <p style={{ color: 'var(--text-secondary)' }}>
-                {campaign.campaign_type === 'amount'
+                {isPointsMode || campaign?.campaign_type === 'amount'
                   ? isReturn ? 'Enter refund amount' : 'Enter bill amount'
                   : 'Log a visit'}
               </p>
             </div>
 
-            {/* Purchase / Return toggle — only for amount campaigns */}
-            {campaign.campaign_type === 'amount' && (
+            {/* Purchase / Return toggle — only for amount campaigns (and disabled for points) */}
+            {!isPointsMode && campaign?.campaign_type === 'amount' && (
               <div
                 style={{
                   display: 'flex',
-                  background: 'var(--bg-surface)',
-                  borderRadius: '12px',
-                  padding: '4px',
+                  background: 'var(--surface)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '3px',
                   marginBottom: '1.5rem',
-                  gap: '4px',
+                  gap: '3px',
+                  border: '1px solid var(--rule)',
                 }}
                 id="txn-mode-toggle"
               >
@@ -225,14 +228,14 @@ export default function TransactionPage() {
                   style={{
                     flex: 1,
                     padding: '0.6rem',
-                    borderRadius: '8px',
+                    borderRadius: 'var(--radius-sm)',
                     border: 'none',
                     cursor: 'pointer',
                     fontWeight: 700,
                     fontSize: '0.9rem',
-                    background: mode === 'purchase' ? 'var(--primary)' : 'transparent',
-                    color: mode === 'purchase' ? '#fff' : 'var(--text-muted)',
-                    transition: 'all 0.2s',
+                    fontFamily: 'inherit',
+                    background: mode === 'purchase' ? 'var(--ink)' : 'transparent',
+                    color: mode === 'purchase' ? '#fff' : 'var(--muted)',
                   }}
                   id="toggle-purchase"
                 >
@@ -243,14 +246,14 @@ export default function TransactionPage() {
                   style={{
                     flex: 1,
                     padding: '0.6rem',
-                    borderRadius: '8px',
+                    borderRadius: 'var(--radius-sm)',
                     border: 'none',
                     cursor: 'pointer',
                     fontWeight: 700,
                     fontSize: '0.9rem',
-                    background: mode === 'return' ? '#dc2626' : 'transparent',
-                    color: mode === 'return' ? '#fff' : 'var(--text-muted)',
-                    transition: 'all 0.2s',
+                    fontFamily: 'inherit',
+                    background: mode === 'return' ? 'var(--red)' : 'transparent',
+                    color: mode === 'return' ? '#fff' : 'var(--muted)',
                   }}
                   id="toggle-return"
                 >
@@ -269,7 +272,7 @@ export default function TransactionPage() {
                 transition: 'border-color 0.2s, background 0.2s',
               }}
             >
-              {campaign.campaign_type === 'amount' ? (
+              {isPointsMode || campaign?.campaign_type === 'amount' ? (
                 <>
                   <label className="label" style={{ textAlign: 'center', fontSize: '1rem' }}>
                     {isReturn ? 'Refund Amount' : 'Bill Amount'}
@@ -282,8 +285,7 @@ export default function TransactionPage() {
                       transform: 'translateY(-50%)',
                       fontSize: '1.5rem',
                       fontWeight: 700,
-                      color: isReturn ? '#dc2626' : 'var(--text-muted)',
-                      transition: 'color 0.2s',
+                      color: isReturn ? 'var(--red)' : 'var(--muted)',
                     }}>
                       {isReturn ? '−₹' : '₹'}
                     </span>
@@ -322,20 +324,15 @@ export default function TransactionPage() {
 
             <button
               onClick={() => {
-                if (campaign.campaign_type === 'visits' && !amount) {
+                if (!isPointsMode && campaign?.campaign_type === 'visits' && !amount) {
                   setAmount('0');
                 }
                 generateQR();
               }}
               className="btn btn-primary btn-full btn-lg"
-              disabled={loading || (campaign.campaign_type === 'amount' && !amount)}
+              disabled={loading || ((isPointsMode || campaign?.campaign_type === 'amount') && !amount)}
               style={{
-                background: isReturn
-                  ? 'linear-gradient(135deg, #dc2626, #b91c1c)'
-                  : undefined,
-                boxShadow: isReturn
-                  ? '0 4px 15px rgba(220, 38, 38, 0.35)'
-                  : undefined,
+                background: isReturn ? 'var(--red)' : undefined,
               }}
               id="generate-qr-btn"
             >
@@ -363,7 +360,7 @@ export default function TransactionPage() {
               marginBottom: '1.5rem',
               fontWeight: isReturn ? 700 : 400,
             }}>
-              {campaign.campaign_type === 'amount'
+              {merchant?.loyalty_mechanism === 'points' || campaign?.campaign_type === 'amount'
                 ? isReturn
                   ? `−${formatCurrency(Number(amount))} refund`
                   : `${formatCurrency(Number(amount))} transaction`
@@ -443,16 +440,16 @@ export default function TransactionPage() {
         {state === 'success' && (
           <div className="slide-up" style={{ textAlign: 'center' }}>
             <div style={{
-              width: '80px',
-              height: '80px',
-              borderRadius: '50%',
-              background: isReturn ? 'rgba(220, 38, 38, 0.12)' : 'rgba(16, 185, 129, 0.15)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '2.5rem',
+              width: '80px',
+              height: '80px',
+              borderRadius: '50%',
+              background: isReturn ? 'var(--red-bg)' : 'var(--green-bg)',
               margin: '0 auto 1.5rem',
-              border: `2px solid ${isReturn ? '#dc2626' : 'var(--primary)'}`,
+              border: `2.5px solid ${isReturn ? 'var(--red)' : 'var(--green)'}`,
+              fontSize: '2.5rem',
             }}>
               {isReturn ? '↩' : '✅'}
             </div>
@@ -464,7 +461,7 @@ export default function TransactionPage() {
               marginBottom: '0.5rem',
               fontWeight: isReturn ? 700 : 400,
             }}>
-              {campaign.campaign_type === 'amount'
+              {merchant?.loyalty_mechanism === 'points' || campaign?.campaign_type === 'amount'
                 ? isReturn
                   ? `−${formatCurrency(Number(amount))} refunded`
                   : `${formatCurrency(Number(amount))} logged`

@@ -211,6 +211,15 @@ export default function MerchantSettingsPage() {
                     </span>
                   </div>
                 </div>
+                <div>
+                  <label className="label" style={{ color: 'var(--text-muted)' }}>Loyalty Program Type</label>
+                  <div style={{ fontWeight: 500 }}>
+                    {merchant.loyalty_mechanism === 'points' ? 'Digital Points (Cashback)' : 'Milestone Campaigns'}
+                  </div>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                    Contact support to switch your program type.
+                  </p>
+                </div>
               </div>
             ) : (
               <p>No merchant data found.</p>

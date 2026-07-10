@@ -41,7 +41,7 @@ export default function MerchantLoginPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--paper)' }}>
       <nav className="nav">
         <Link href="/" className="nav-brand">LoyaltyQR</Link>
       </nav>
@@ -78,7 +78,7 @@ export default function MerchantLoginPage() {
                 <button 
                   type="button" 
                   onClick={() => setShowForgotMessage(true)}
-                  style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 600, padding: 0 }}
+                style={{ background: 'none', border: 'none', color: 'var(--ink)', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 600, padding: 0, fontFamily: 'inherit' }}
                 >
                   Forgot Password?
                 </button>
@@ -122,11 +122,11 @@ export default function MerchantLoginPage() {
 
             <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', textAlign: 'center', marginTop: '1.25rem', lineHeight: '1.4' }}>
               By signing in, you agree to our{' '}
-              <Link href="/terms" target="_blank" style={{ color: 'var(--primary-light)', textDecoration: 'underline' }}>
+              <Link href="/terms" target="_blank" style={{ color: 'var(--ink)', textDecoration: 'underline' }}>
                 Terms of Use
               </Link>{' '}
               and{' '}
-              <Link href="/privacy" target="_blank" style={{ color: 'var(--primary-light)', textDecoration: 'underline' }}>
+              <Link href="/privacy" target="_blank" style={{ color: 'var(--ink)', textDecoration: 'underline' }}>
                 Privacy Policy
               </Link>.
             </p>
@@ -141,7 +141,7 @@ export default function MerchantLoginPage() {
             }}
           >
             Don&apos;t have an account?{' '}
-            <Link href="/merchant/signup" style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }}>
+            <Link href="/merchant/signup" style={{ color: 'var(--ink)', fontWeight: 600, textDecoration: 'none' }}>
               Sign up here
             </Link>
           </p>

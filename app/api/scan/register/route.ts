@@ -51,20 +51,118 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Get merchant + campaign
+    // 3. Get merchant
     const { data: merchant } = await supabase
       .from('merchants')
       .select('*')
       .eq('id', qrToken.merchant_id)
       .single();
 
+    if (!merchant) {
+      return NextResponse.json(
+        { error: 'Merchant not found' },
+        { status: 400 }
+      );
+    }
+
+    // =====================================================================
+    // POINTS MERCHANTS — skip campaign/enrollment, return points-specific data
+    // =====================================================================
+    if (merchant.loyalty_mechanism === 'points') {
+      // Find or create customer
+      let isNewCustomer = false;
+      let { data: customer } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('whatsapp_number', whatsapp_number)
+        .single();
+
+      if (!customer) {
+        isNewCustomer = true;
+        const { data: newCustomer, error: createError } = await supabase
+          .from('customers')
+          .insert({
+            whatsapp_number,
+            name: name || null,
+            birth_month: birth_month || null,
+            birth_day: birth_day || null,
+          })
+          .select()
+          .single();
+
+        if (createError || !newCustomer) {
+          return NextResponse.json({ error: 'Failed to register customer' }, { status: 500 });
+        }
+        customer = newCustomer;
+      } else {
+        const updates: Record<string, unknown> = {};
+        if (name && !customer.name) updates.name = name;
+        if (birth_month && birth_day && (!customer.birth_month || !customer.birth_day)) {
+          updates.birth_month = birth_month;
+          updates.birth_day = birth_day;
+        }
+        if (Object.keys(updates).length > 0) {
+          await supabase.from('customers').update(updates).eq('id', customer.id);
+          customer = { ...customer, ...updates };
+        }
+      }
+
+      // Get points config
+      const { data: pointsConfig } = await supabase
+        .from('points_config')
+        .select('*')
+        .eq('merchant_id', merchant.id)
+        .single();
+
+      // Get current balance
+      const { data: latestLedger } = await supabase
+        .from('points_ledger')
+        .select('balance_after')
+        .eq('merchant_id', merchant.id)
+        .eq('customer_id', customer.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      const currentBalance = latestLedger?.balance_after ?? 0;
+
+      // Build WhatsApp deep link
+      const businessNumber = (process.env.WHATSAPP_BUSINESS_NUMBER || '').replace(/\D/g, '');
+      const waNumber = businessNumber.startsWith('91') ? businessNumber : `91${businessNumber}`;
+      const whatsappUrl = businessNumber
+        ? `https://wa.me/${waNumber}?text=TXN-${token}`
+        : null;
+
+      return NextResponse.json({
+        success: true,
+        merchant_id: merchant.id,
+        loyalty_mechanism: 'points',
+        whatsapp_url: whatsappUrl,
+        is_new_customer: isNewCustomer,
+        shop_name: merchant.shop_name,
+        shop_category: merchant.shop_category,
+        amount: qrToken.amount,
+        points_config: pointsConfig ? {
+          cashback_percentage: pointsConfig.cashback_percentage,
+          conversion_rate: pointsConfig.conversion_rate,
+        } : null,
+        points_to_earn: pointsConfig
+          ? Math.floor(Number(qrToken.amount) * (Number(pointsConfig.cashback_percentage) / 100))
+          : 0,
+        current_balance: currentBalance,
+      });
+    }
+
+    // =====================================================================
+    // MILESTONE MERCHANTS — existing campaign/enrollment flow
+    // =====================================================================
     const { data: campaign } = await supabase
       .from('campaigns')
       .select('*')
       .eq('id', qrToken.campaign_id)
       .single();
 
-    if (!merchant || !campaign) {
+    if (!campaign) {
       return NextResponse.json(
         { error: 'Campaign not found' },
         { status: 400 }
@@ -212,9 +310,15 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Calculate deadline: use campaign end_date if set, else duration_days from now
+      // Calculate deadline:
+      // If rolling window mode: Now + window_duration_days
+      // Else if fixed mode with end_date: use end_date
+      // Else: Now + duration_days
       let deadline: Date;
-      if (campaign.end_date) {
+      if (campaign.window_mode === 'rolling' && campaign.window_duration_days) {
+        deadline = new Date();
+        deadline.setDate(deadline.getDate() + campaign.window_duration_days);
+      } else if (campaign.end_date) {
         deadline = new Date(campaign.end_date);
         // Set to end of day IST
         deadline.setHours(23, 59, 59, 999);
@@ -233,6 +337,12 @@ export async function POST(request: NextRequest) {
           total_visits: 0,
           deadline_at: deadline.toISOString(),
           status: 'active',
+          config_snapshot: campaign.window_mode === 'rolling' ? {
+            target_amount: campaign.target_amount,
+            target_visits: campaign.target_visits,
+            duration_days: campaign.duration_days,
+            reward_description: campaign.reward_description,
+          } : null,
         })
         .select()
         .single();

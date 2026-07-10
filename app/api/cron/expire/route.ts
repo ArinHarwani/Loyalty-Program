@@ -124,6 +124,112 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // ==========================================
+    // 3. Points Expiry Warnings
+    // ==========================================
+    
+    // Find all points configurations that have an expiry set
+    const { data: pointConfigs } = await supabase
+      .from('points_config')
+      .select('merchant_id, expiry_months')
+      .not('expiry_months', 'is', null);
+
+    for (const config of pointConfigs || []) {
+      const expiryMonths = config.expiry_months;
+      if (!expiryMonths) continue;
+
+      // Find the latest ledger entries for each customer for this merchant
+      const { data: balances } = await supabase
+        .from('current_points_balances')
+        .select('*')
+        .eq('merchant_id', config.merchant_id)
+        .eq('warning_sent', false)
+        .gt('balance', 0);
+
+      for (const balance of balances || []) {
+        // Calculate expiry date (last activity + expiry_months)
+        const lastActivityDate = new Date(balance.last_activity_at);
+        const expiryDate = new Date(lastActivityDate);
+        expiryDate.setMonth(expiryDate.getMonth() + expiryMonths);
+
+        const msUntilExpiry = expiryDate.getTime() - Date.now();
+        const daysUntilExpiry = msUntilExpiry / (1000 * 60 * 60 * 24);
+
+        // If exactly between 2 and 3 days away
+        if (daysUntilExpiry > 2 && daysUntilExpiry <= 3) {
+          // Fetch customer and merchant
+          const { data: customer } = await supabase.from('customers').select('*').eq('id', balance.customer_id).single();
+          const { data: merchant } = await supabase.from('merchants').select('*').eq('id', balance.merchant_id).single();
+
+          if (!customer || !customer.whatsapp_number || !merchant || merchant.subscription_status !== 'active') {
+            continue;
+          }
+
+          const waNumber = customer.whatsapp_number.startsWith('91')
+            ? customer.whatsapp_number
+            : `91${customer.whatsapp_number}`;
+
+          try {
+            await sendWhatsAppTemplate(
+              waNumber,
+              'account_update',
+              [
+                {
+                  type: 'body',
+                  parameters: [
+                    { type: 'text', text: merchant.shop_name }  // {{1}} = shop name
+                  ]
+                },
+                {
+                  type: 'button',
+                  sub_type: 'quick_reply',
+                  index: '0',
+                  parameters: [
+                    {
+                      type: 'payload',
+                      payload: `POINTS-${merchant.id}-${customer.id}`
+                    }
+                  ]
+                }
+              ]
+            );
+
+            // Mark warning as sent on the specific ledger row
+            await supabase
+              .from('points_ledger')
+              .update({ warning_sent: true })
+              .eq('id', balance.ledger_id);
+
+            // Log as sent
+            await supabase.from('message_logs').insert({
+              merchant_id: merchant.id,
+              customer_id: customer.id,
+              template_name: 'account_update',
+              category: 'utility',
+              cost: 0.115,
+              status: 'sent',
+            });
+
+            warnings++;
+          } catch (error) {
+            console.error(`Points expiry warning failed for customer ${customer.id}:`, error);
+
+            await supabase.from('message_logs').insert({
+              merchant_id: merchant.id,
+              customer_id: customer.id,
+              template_name: 'account_update',
+              category: 'utility',
+              cost: 0.115,
+              status: 'failed',
+            });
+
+            warningsFailed++;
+          }
+        }
+      }
+    }
+
+
     return NextResponse.json({
       success: true,
       expired,
