@@ -138,6 +138,7 @@ export async function POST(request: NextRequest) {
         merchant_id: merchant.id,
         loyalty_mechanism: 'points',
         whatsapp_url: whatsappUrl,
+        whatsapp_number: whatsapp_number,
         is_new_customer: isNewCustomer,
         shop_name: merchant.shop_name,
         shop_category: merchant.shop_category,
@@ -368,6 +369,7 @@ export async function POST(request: NextRequest) {
       success: true,
       merchant_id: merchant.id,
       whatsapp_url: whatsappUrl,
+      whatsapp_number: whatsapp_number,
       is_new_customer: isNewCustomer,
       is_new_enrollment: isNewEnrollment,
       campaign: {
