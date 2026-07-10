@@ -10,6 +10,7 @@ import type { Merchant, Campaign } from '@/types';
 
 type PageState = 'input' | 'qr' | 'success' | 'expired';
 type TxnMode = 'purchase' | 'return';
+type ClaimResult = { enrollment_id: string; customer_phone: string; reward: string; already_claimed: boolean } | null;
 
 export default function TransactionPage() {
   const router = useRouter();
@@ -24,6 +25,14 @@ export default function TransactionPage() {
   const [scannedCustomer, setScannedCustomer] = useState('');
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Claim code verification
+  const [claimCode, setClaimCode] = useState('');
+  const [claimResult, setClaimResult] = useState<ClaimResult>(null);
+  const [claimLoading, setClaimLoading] = useState(false);
+  const [claimError, setClaimError] = useState('');
+  const [claimSuccess, setClaimSuccess] = useState(false);
+  const [showClaimSection, setShowClaimSection] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -157,6 +166,75 @@ export default function TransactionPage() {
     setScannedCustomer('');
     setMode('purchase');
   }, []);
+
+  const handleVerifyClaim = async () => {
+    const code = claimCode.trim().toUpperCase();
+    if (!code) return;
+    setClaimError('');
+    setClaimResult(null);
+    setClaimSuccess(false);
+    setClaimLoading(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) { setClaimError('Not logged in.'); return; }
+      const { data: mData } = await supabase.from('merchants').select('id').eq('email', user.email).single();
+      if (!mData) { setClaimError('Merchant not found.'); return; }
+
+      // Search for the claim code in enrollments for this merchant
+      const { data: enrollment } = await supabase
+        .from('enrollments')
+        .select('id, status, claimed, claim_code, customer:customers(whatsapp_number), campaign:campaigns(reward_description)')
+        .eq('merchant_id', mData.id)
+        .ilike('claim_code', code)
+        .maybeSingle();
+
+      if (!enrollment) {
+        setClaimError('No reward found for this code. Check and try again.');
+        return;
+      }
+
+      const customer = Array.isArray(enrollment.customer) ? enrollment.customer[0] : enrollment.customer;
+      const campaign = Array.isArray(enrollment.campaign) ? enrollment.campaign[0] : enrollment.campaign;
+
+      setClaimResult({
+        enrollment_id: enrollment.id,
+        customer_phone: customer?.whatsapp_number || 'Unknown',
+        reward: campaign?.reward_description || 'Reward',
+        already_claimed: !!enrollment.claimed,
+      });
+    } catch {
+      setClaimError('Something went wrong. Please try again.');
+    } finally {
+      setClaimLoading(false);
+    }
+  };
+
+  const handleMarkClaimed = async () => {
+    if (!claimResult) return;
+    setClaimLoading(true);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/merchant/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+        body: JSON.stringify({ enrollment_id: claimResult.enrollment_id }),
+      });
+      if (res.ok) {
+        setClaimSuccess(true);
+        setClaimResult(null);
+        setClaimCode('');
+      } else {
+        const d = await res.json();
+        setClaimError(d.error || 'Failed to mark as claimed.');
+      }
+    } catch {
+      setClaimError('Something went wrong.');
+    } finally {
+      setClaimLoading(false);
+    }
+  };
 
   const circumference = 2 * Math.PI * 36;
   const offset = circumference - (countdown / 180) * circumference;
@@ -346,6 +424,103 @@ export default function TransactionPage() {
                 '📱 Generate QR Code'
               )}
             </button>
+
+            {/* ── VERIFY CLAIM CODE ── */}
+            {!isPointsMode && (
+              <div style={{ marginTop: '2rem' }}>
+                <button
+                  onClick={() => {
+                    setShowClaimSection(v => !v);
+                    setClaimError('');
+                    setClaimResult(null);
+                    setClaimSuccess(false);
+                    setClaimCode('');
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--muted)',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    padding: 0,
+                    marginBottom: '0.75rem',
+                  }}
+                >
+                  🎟️ {showClaimSection ? '▲ Hide' : 'Verify a Reward Claim Code'}
+                </button>
+
+                {showClaimSection && (
+                  <div className="card" style={{ padding: '1.25rem' }}>
+                    <p style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.75rem', color: 'var(--charcoal)' }}>Verify Claim Code</p>
+                    <p style={{ color: 'var(--muted)', fontSize: '0.82rem', marginBottom: '1rem' }}>
+                      Customer will show you a code like <strong>#WIN-A3F7</strong>. Enter it below to verify and mark as given.
+                    </p>
+
+                    {claimSuccess && (
+                      <div style={{ background: 'var(--green-bg)', border: '1px solid var(--green)', borderRadius: 'var(--radius-md)', padding: '0.75rem 1rem', marginBottom: '0.75rem', color: 'var(--green)', fontWeight: 600, fontSize: '0.9rem' }}>
+                        ✅ Reward marked as given!
+                      </div>
+                    )}
+
+                    {claimError && (
+                      <div style={{ background: 'var(--red-bg)', border: '1px solid var(--red)', borderRadius: 'var(--radius-md)', padding: '0.75rem 1rem', marginBottom: '0.75rem', color: 'var(--red)', fontSize: '0.85rem' }}>
+                        ⚠️ {claimError}
+                      </div>
+                    )}
+
+                    {claimResult && !claimResult.already_claimed && (
+                      <div style={{ background: 'var(--green-bg)', border: '1.5px solid var(--green)', borderRadius: 'var(--radius-md)', padding: '1rem', marginBottom: '0.75rem' }}>
+                        <p style={{ fontWeight: 700, color: 'var(--green)', marginBottom: '0.3rem' }}>✅ Valid Reward!</p>
+                        <p style={{ fontSize: '0.88rem', color: 'var(--charcoal)', marginBottom: '0.15rem' }}>
+                          Customer: <strong>{claimResult.customer_phone.slice(0, 5) + 'XXXXX'}</strong>
+                        </p>
+                        <p style={{ fontSize: '0.88rem', color: 'var(--charcoal)', marginBottom: '1rem' }}>
+                          Reward: <strong>{claimResult.reward}</strong>
+                        </p>
+                        <button
+                          onClick={handleMarkClaimed}
+                          className="btn btn-primary btn-full"
+                          disabled={claimLoading}
+                        >
+                          {claimLoading ? 'Marking...' : '🎁 Give Reward & Mark as Claimed'}
+                        </button>
+                      </div>
+                    )}
+
+                    {claimResult?.already_claimed && (
+                      <div style={{ background: '#fff8e1', border: '1px solid #f59e0b', borderRadius: 'var(--radius-md)', padding: '0.75rem 1rem', marginBottom: '0.75rem', color: '#92400e', fontSize: '0.85rem' }}>
+                        ⚠️ This reward has already been claimed.
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input
+                        type="text"
+                        className="input"
+                        placeholder="e.g. #WIN-A3F7"
+                        value={claimCode}
+                        onChange={e => { setClaimCode(e.target.value); setClaimError(''); setClaimResult(null); setClaimSuccess(false); }}
+                        onKeyDown={e => { if (e.key === 'Enter') handleVerifyClaim(); }}
+                        style={{ flex: 1, fontFamily: 'monospace', letterSpacing: '0.05em' }}
+                        id="claim-code-input"
+                      />
+                      <button
+                        onClick={handleVerifyClaim}
+                        className="btn btn-primary"
+                        disabled={claimLoading || !claimCode.trim()}
+                        id="verify-claim-btn"
+                      >
+                        {claimLoading ? '...' : 'Verify'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
