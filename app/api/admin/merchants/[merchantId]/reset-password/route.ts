@@ -48,7 +48,7 @@ export async function POST(
     // Use service role client to update auth user password
     const supabaseAdmin = createServiceClient();
 
-    // Verify merchant exists
+    // Verify merchant exists in DB and get their email
     const { data: merchantData, error: merchantError } = await supabaseAdmin
       .from('merchants')
       .select('id, email')
@@ -59,9 +59,20 @@ export async function POST(
       return NextResponse.json({ error: 'Merchant not found' }, { status: 404 });
     }
 
-    // Update the password in auth.users
+    // Look up the auth user by email to get the correct auth UUID
+    // (the merchants.id may not always match auth.users.id)
+    const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+    if (listError) {
+      return NextResponse.json({ error: 'Failed to look up auth user' }, { status: 500 });
+    }
+    const authUser = users.find(u => u.email === merchantData.email);
+    if (!authUser) {
+      return NextResponse.json({ error: `No auth account found for ${merchantData.email}` }, { status: 404 });
+    }
+
+    // Update the password in auth.users using the correct auth UUID
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-      merchantId,
+      authUser.id,
       { password: newPassword }
     );
 
