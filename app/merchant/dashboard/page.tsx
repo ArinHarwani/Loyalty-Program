@@ -18,7 +18,7 @@ export default function DashboardPage() {
 
   // Points specific state
   const [pointsConfig, setPointsConfig] = useState<PointsConfig | null>(null);
-  const [ledgerEntries, setLedgerEntries] = useState<PointsLedgerEntry[]>([]);
+  const [ledgerEntries, setLedgerEntries] = useState<(PointsLedgerEntry & { customer?: Customer })[]>([]);
 
   const [totalCustomers, setTotalCustomers] = useState(0);
   const [loading, setLoading] = useState(true);
