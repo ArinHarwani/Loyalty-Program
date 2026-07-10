@@ -127,11 +127,9 @@ export async function POST(request: NextRequest) {
       const currentBalance = latestLedger?.balance_after ?? 0;
 
       // Build WhatsApp deep link
-      const businessNumber = (process.env.WHATSAPP_BUSINESS_NUMBER || '').replace(/\D/g, '');
+      const businessNumber = (process.env.WHATSAPP_BUSINESS_NUMBER || '919660610690').replace(/\D/g, '');
       const waNumber = businessNumber.startsWith('91') ? businessNumber : `91${businessNumber}`;
-      const whatsappUrl = businessNumber
-        ? `whatsapp://send?phone=${waNumber}&text=TXN-${token}`
-        : null;
+      const whatsappUrl = `https://wa.me/${waNumber}?text=TXN-${token}`;
 
       return NextResponse.json({
         success: true,
@@ -358,12 +356,9 @@ export async function POST(request: NextRequest) {
     }
 
     // 6. Return success
-    const businessNumber = (process.env.WHATSAPP_BUSINESS_NUMBER || '').replace(/\D/g, '');
-    // Build WhatsApp deep link — include country code 91 for India if not already present
+    const businessNumber = (process.env.WHATSAPP_BUSINESS_NUMBER || '919660610690').replace(/\D/g, '');
     const waNumber = businessNumber.startsWith('91') ? businessNumber : `91${businessNumber}`;
-    const whatsappUrl = businessNumber
-      ? `whatsapp://send?phone=${waNumber}&text=TXN-${token}`
-      : null;
+    const whatsappUrl = `https://wa.me/${waNumber}?text=TXN-${token}`;
 
     return NextResponse.json({
       success: true,
