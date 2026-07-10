@@ -146,7 +146,7 @@ export default function ScanPage() {
           console.warn('localStorage is not available', e);
         }
 
-        const waUrl = data.whatsapp_url || `https://wa.me/?text=TXN-${token}`;
+        const waUrl = data.whatsapp_url || `whatsapp://send?text=TXN-${token}`;
         setWhatsappUrl(waUrl);
         setState('redirecting');
 
@@ -495,7 +495,7 @@ export default function ScanPage() {
             <span className="spinner" style={{ width: 28, height: 28, display: 'block', margin: '0 auto 1.5rem' }} />
 
             <a
-              href={whatsappUrl || `https://wa.me/?text=TXN-${token}`}
+              href={whatsappUrl || `whatsapp://send?text=TXN-${token}`}
               className="btn btn-whatsapp btn-full btn-lg"
               style={{ textDecoration: 'none' }}
             >
