@@ -10,11 +10,6 @@ interface CustomerInfo {
   whatsapp_number: string;
 }
 
-interface PointsConfig {
-  cashback_percentage: number;
-  conversion_rate: number;
-}
-
 export default function RedeemPointsPage() {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -66,8 +61,8 @@ export default function RedeemPointsPage() {
       setBalance(data.balance);
       setPointsToRedeem('');
       setStep(2);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
     } finally {
       setLoading(false);
     }
@@ -117,8 +112,8 @@ export default function RedeemPointsPage() {
       }
 
       setStep(3);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
     } finally {
       setLoading(false);
     }

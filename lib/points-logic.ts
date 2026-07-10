@@ -28,7 +28,7 @@ export async function getCustomerBalance(
     .eq('customer_id', customerId)
     .order('created_at', { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
   return data?.balance_after ?? 0;
 }
@@ -89,7 +89,7 @@ export async function processPointsEarn(
   }
 
   // 3. Find or create customer
-  let { data: customer } = await supabase
+  const { data: customer } = await supabase
     .from('customers')
     .select('*')
     .eq('whatsapp_number', customerNumber)

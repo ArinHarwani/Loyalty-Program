@@ -38,12 +38,19 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Missing signature' }, { status: 401 });
       }
 
-      const expectedSig =
-        'sha256=' +
-        crypto
-          .createHmac('sha256', process.env.WHATSAPP_APP_SECRET)
-          .update(body)
-          .digest('hex');
+      let expectedSig: string;
+      try {
+        expectedSig =
+          'sha256=' +
+          crypto
+            .createHmac('sha256', process.env.WHATSAPP_APP_SECRET)
+            .update(body)
+            .digest('hex');
+      } catch (cryptoError) {
+        console.error('Webhook crypto error during signature verification:', cryptoError);
+        // Fail-closed: If we cannot verify, we must reject the request to prevent malicious bypass
+        return NextResponse.json({ error: 'Internal signature computation failed' }, { status: 500 });
+      }
 
       if (
         signature.length !== expectedSig.length ||

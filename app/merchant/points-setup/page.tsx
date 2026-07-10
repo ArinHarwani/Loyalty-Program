@@ -2,9 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase';
 import Link from 'next/link';
-import type { PointsConfig } from '@/types';
 
 export default function PointsSetupPage() {
   const router = useRouter();
@@ -70,8 +68,8 @@ export default function PointsSetupPage() {
 
       setSuccess('Points program configured successfully!');
       setTimeout(() => router.push('/merchant/dashboard'), 1500);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
     } finally {
       setSaving(false);
     }

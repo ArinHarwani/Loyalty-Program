@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase';
 import { formatCurrency, maskPhone, calcPercentage, daysRemaining, formatDateTime, formatDate } from '@/lib/utils';
 import { SUPPORT_WHATSAPP } from '@/lib/constants';
 import Link from 'next/link';
-import type { Merchant, Campaign, Enrollment, Transaction, Customer } from '@/types';
+import type { Merchant, Campaign, Enrollment, Transaction, Customer, PointsConfig, PointsLedgerEntry } from '@/types';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -17,8 +17,8 @@ export default function DashboardPage() {
   const [winners, setWinners] = useState<(Enrollment & { customer?: Customer })[]>([]);
 
   // Points specific state
-  const [pointsConfig, setPointsConfig] = useState<any>(null);
-  const [ledgerEntries, setLedgerEntries] = useState<any[]>([]);
+  const [pointsConfig, setPointsConfig] = useState<PointsConfig | null>(null);
+  const [ledgerEntries, setLedgerEntries] = useState<PointsLedgerEntry[]>([]);
 
   const [totalCustomers, setTotalCustomers] = useState(0);
   const [loading, setLoading] = useState(true);
