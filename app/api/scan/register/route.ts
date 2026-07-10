@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
       const businessNumber = (process.env.WHATSAPP_BUSINESS_NUMBER || '').replace(/\D/g, '');
       const waNumber = businessNumber.startsWith('91') ? businessNumber : `91${businessNumber}`;
       const whatsappUrl = businessNumber
-        ? `https://wa.me/${waNumber}?text=${encodeURIComponent(`Send this code to activate your loyalty program - TXN-${token}`)}`
+        ? `https://wa.me/${waNumber}?text=TXN-${token}`
         : null;
 
       return NextResponse.json({
@@ -362,7 +362,7 @@ export async function POST(request: NextRequest) {
     // Build WhatsApp deep link — include country code 91 for India if not already present
     const waNumber = businessNumber.startsWith('91') ? businessNumber : `91${businessNumber}`;
     const whatsappUrl = businessNumber
-      ? `https://wa.me/${waNumber}?text=${encodeURIComponent(`Send this code to activate your loyalty program - TXN-${token}`)}`
+      ? `https://wa.me/${waNumber}?text=TXN-${token}`
       : null;
 
     return NextResponse.json({

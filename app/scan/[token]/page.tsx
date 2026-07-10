@@ -148,8 +148,8 @@ export default function ScanPage() {
 
         const waUrl = data.whatsapp_url
           || (data.whatsapp_number
-            ? `https://wa.me/91${data.whatsapp_number}?text=${encodeURIComponent(`Send this code to activate your loyalty program - TXN-${token}`)}`
-            : `whatsapp://send?text=${encodeURIComponent(`Send this code to activate your loyalty program - TXN-${token}`)}`);
+            ? `https://wa.me/91${data.whatsapp_number}?text=TXN-${token}`
+            : `whatsapp://send?text=TXN-${token}`);
         setWhatsappUrl(waUrl);
         setState('redirecting');
 
@@ -498,7 +498,7 @@ export default function ScanPage() {
             <span className="spinner" style={{ width: 28, height: 28, display: 'block', margin: '0 auto 1.5rem' }} />
 
             <a
-              href={whatsappUrl || `whatsapp://send?text=${encodeURIComponent(`Send this code to activate your loyalty program - TXN-${token}`)}`}
+              href={whatsappUrl || `whatsapp://send?text=TXN-${token}`}
               className="btn btn-whatsapp btn-full btn-lg"
               style={{ textDecoration: 'none' }}
             >
