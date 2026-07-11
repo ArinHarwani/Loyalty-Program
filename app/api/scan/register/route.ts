@@ -231,33 +231,17 @@ export async function POST(request: NextRequest) {
       .limit(1)
       .single();
 
+    let previousCycleNumber = 0;
+
     if (enrollment) {
+      previousCycleNumber = enrollment.cycle_number || 0;
       // Check status
       if (enrollment.status === 'expired') {
         // Allow re-enrollment by creating a new enrollment
         enrollment = null; // fall through to creation below
       } else if (enrollment.status === 'completed') {
-        // Already won — let them scan anyway, return success
-        return NextResponse.json({
-          success: true,
-          merchant_id: merchant.id,
-          is_new_customer: false,
-          is_new_enrollment: false,
-          campaign: {
-            name: campaign.name,
-            target_amount: campaign.target_amount,
-            target_visits: campaign.target_visits,
-            campaign_type: campaign.campaign_type,
-            reward_description: campaign.reward_description,
-            duration_days: campaign.duration_days,
-          },
-          enrollment: {
-            total_spent: enrollment.total_spent,
-            total_visits: enrollment.total_visits,
-            deadline_at: enrollment.deadline_at,
-            status: enrollment.status,
-          },
-        });
+        // Allow auto-rollover to a new cycle by falling through to creation
+        enrollment = null; // fall through to creation below
       } else if (enrollment.status === 'active') {
         // Check if deadline passed
         if (new Date(enrollment.deadline_at) < new Date()) {
@@ -336,6 +320,7 @@ export async function POST(request: NextRequest) {
           total_visits: 0,
           deadline_at: deadline.toISOString(),
           status: 'active',
+          cycle_number: previousCycleNumber + 1,
           config_snapshot: campaign.window_mode === 'rolling' ? {
             target_amount: campaign.target_amount,
             target_visits: campaign.target_visits,

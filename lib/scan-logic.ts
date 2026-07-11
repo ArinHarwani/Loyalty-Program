@@ -151,31 +151,38 @@ export async function processTransaction(
     .eq('customer_id', customer.id)
     .eq('campaign_id', campaign.id)
     .eq('merchant_id', merchant.id)
-    .in('status', ['active', 'completed'])
     .order('enrolled_at', { ascending: false })
     .limit(1)
     .single();
 
-  if (!enrollment) {
-    // Check if the merchant has reached their customer limit
-    if (merchant.customer_limit) {
+  let activeEnrollment = (enrollment && enrollment.status === 'active') ? enrollment : null;
+  let latestCycleNumber = enrollment ? (enrollment.cycle_number || 1) : 0;
+
+  // Helper to create a new cycle
+  const createNewEnrollment = async (cycleNum: number) => {
+    // Check if the merchant has reached their customer limit (only for first ever enrollment)
+    if (cycleNum === 1 && merchant.customer_limit) {
       const { count, error: countError } = await supabase
         .from('enrollments')
         .select('customer_id', { count: 'exact', head: true })
         .eq('merchant_id', merchant.id);
 
       if (!countError && count !== null && count >= merchant.customer_limit) {
-        await sendWhatsAppMessage(
-          senderNumber,
-          "We're sorry, but this shop has reached its maximum loyalty capacity at the moment. Please ask the shopkeeper to upgrade their plan."
-        );
-        return;
+        throw new Error("We're sorry, but this shop has reached its maximum loyalty capacity at the moment. Please ask the shopkeeper to upgrade their plan.");
       }
     }
 
-    // Edge case: customer exists but no enrollment — auto-create one
-    const deadline = new Date();
-    deadline.setDate(deadline.getDate() + campaign.duration_days);
+    let deadline: Date;
+    if (campaign.window_mode === 'rolling' && campaign.window_duration_days) {
+      deadline = new Date();
+      deadline.setDate(deadline.getDate() + campaign.window_duration_days);
+    } else if (campaign.end_date) {
+      deadline = new Date(campaign.end_date);
+      deadline.setHours(23, 59, 59, 999);
+    } else {
+      deadline = new Date();
+      deadline.setDate(deadline.getDate() + campaign.duration_days);
+    }
 
     const { data: newEnrollment } = await supabase
       .from('enrollments')
@@ -187,98 +194,48 @@ export async function processTransaction(
         total_visits: 0,
         deadline_at: deadline.toISOString(),
         status: 'active',
+        cycle_number: cycleNum,
+        config_snapshot: campaign.window_mode === 'rolling' ? {
+          target_amount: campaign.target_amount,
+          target_visits: campaign.target_visits,
+          duration_days: campaign.duration_days,
+          reward_description: campaign.reward_description,
+        } : null,
       })
       .select()
       .single();
-    enrollment = newEnrollment;
-  }
-
-  if (!enrollment) {
-    await sendWhatsAppMessage(senderNumber, 'Could not process your transaction. Please try again.');
-    return;
-  }
-
-  // For completed enrollments: only returns are allowed (to adjust the total).
-  // Purchases after completion just replay the completion message.
-  if (enrollment.status === 'completed' && qrToken.amount >= 0) {
-    await sendWhatsAppMessage(
-      senderNumber,
-      `🎉 You've already completed your goal at ${merchant.shop_name}!\n\nClaim Code: ${enrollment.claim_code}\nShow this to the shopkeeper!`
-    );
-    // Still mark token used
-    await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken);
-    return;
-  }
-
-  // Check if deadline passed
-  if (new Date(enrollment.deadline_at) < new Date()) {
-    await supabase.from('enrollments').update({ status: 'expired' }).eq('id', enrollment.id);
-    await sendWhatsAppMessage(
-      senderNumber,
-      `⏰ Your loyalty enrollment at ${merchant.shop_name} has expired.\n\nScan the QR at your next visit to start fresh!`
-    );
-    await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken);
-    return;
-  }
+    
+    return newEnrollment;
+  };
 
   const isReturnTxn = Number(qrToken.amount) < 0;
 
-  // 5. Insert transaction
-  await supabase.from('transactions').insert({
-    enrollment_id: enrollment.id,
-    merchant_id: merchant.id,
-    amount: qrToken.amount,
-    qr_token: txnToken,
-  });
-
-  // 6. Update totals
-  // For returns: clamp total_spent at 0; never go negative.
-  // For returns: do NOT increment total_visits.
-  const newTotalSpent = Math.max(0, Number(enrollment.total_spent) + Number(qrToken.amount));
-  const newTotalVisits = isReturnTxn
-    ? Number(enrollment.total_visits)
-    : Number(enrollment.total_visits) + 1;
-
-  await supabase
-    .from('enrollments')
-    .update({ total_spent: newTotalSpent, total_visits: newTotalVisits })
-    .eq('id', enrollment.id);
-
-  // 7. Check completion — returns never trigger completion, and don't revoke it
-  let isCompleted = false;
-  let claimCode: string | undefined;
-
-  if (!isReturnTxn && enrollment.status !== 'completed') {
-    if (campaign.campaign_type === 'amount' && campaign.target_amount) {
-      isCompleted = newTotalSpent >= campaign.target_amount;
-    } else if (campaign.campaign_type === 'visits' && campaign.target_visits) {
-      isCompleted = newTotalVisits >= campaign.target_visits;
-    }
-
-    if (isCompleted) {
-      claimCode = generateClaimCode();
-      await supabase
-        .from('enrollments')
-        .update({ status: 'completed', claim_code: claimCode })
-        .eq('id', enrollment.id);
-    }
-  }
-
-  // 8. Mark token used
-  await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken);
-
-  // 9. Compose reply
-  const target = campaign.campaign_type === 'amount'
-    ? campaign.target_amount || 0
-    : campaign.target_visits || 0;
-  const current = campaign.campaign_type === 'amount' ? newTotalSpent : newTotalVisits;
-  const percentage = calcPercentage(current, target);
-  const daysLeft = daysRemaining(enrollment.deadline_at);
-  const isFirstTransaction = !isReturnTxn && newTotalVisits === 1;
-  const customerName = customer.name || '';
-
   if (isReturnTxn) {
+    if (!activeEnrollment) {
+      await sendWhatsAppMessage(senderNumber, 'No active goal found to return from.');
+      return;
+    }
     const returnAmount = Math.abs(Number(qrToken.amount));
+    const newTotalSpent = Math.max(0, Number(activeEnrollment.total_spent) - returnAmount);
+
+    // 5. Insert transaction
+    await supabase.from('transactions').insert({
+      enrollment_id: activeEnrollment.id,
+      merchant_id: merchant.id,
+      amount: qrToken.amount,
+      qr_token: txnToken,
+    });
+
+    await supabase
+      .from('enrollments')
+      .update({ total_spent: newTotalSpent })
+      .eq('id', activeEnrollment.id);
+
+    const target = campaign.campaign_type === 'amount'
+      ? activeEnrollment.config_snapshot?.target_amount || campaign.target_amount || 0
+      : activeEnrollment.config_snapshot?.target_visits || campaign.target_visits || 0;
+    const daysLeft = daysRemaining(activeEnrollment.deadline_at);
+    
     const returnReply = `${merchant.shop_name} — Return Processed ↩\n\n−₹${returnAmount} adjusted from your total.\nUpdated total: ₹${newTotalSpent} / ₹${target}\n${daysLeft} days remaining`;
     await sendWhatsAppMessage(senderNumber, returnReply);
     await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken);
@@ -293,6 +250,123 @@ export async function processTransaction(
     return;
   }
 
+  // Handle active enrollment deadline
+  if (activeEnrollment && new Date(activeEnrollment.deadline_at) < new Date()) {
+    await supabase.from('enrollments').update({ status: 'expired' }).eq('id', activeEnrollment.id);
+    await sendWhatsAppMessage(
+      senderNumber,
+      `⏰ Your loyalty enrollment at ${merchant.shop_name} has expired.\n\nScan the QR at your next visit to start fresh!`
+    );
+    await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken);
+    return;
+  }
+
+  let remainingPurchaseAmount = Number(qrToken.amount);
+  let cycleCompletions: Array<{ claimCode: string; reward: string }> = [];
+  let isFirstTransaction = false;
+  let finalEnrollment = null;
+
+  try {
+    if (campaign.campaign_type === 'amount') {
+      // Amount Campaign: cascade through targets
+      while (remainingPurchaseAmount > 0) {
+        if (!activeEnrollment) {
+          latestCycleNumber++;
+          activeEnrollment = await createNewEnrollment(latestCycleNumber);
+          if (activeEnrollment && activeEnrollment.total_visits === 0 && remainingPurchaseAmount === Number(qrToken.amount)) {
+             isFirstTransaction = true;
+          }
+        }
+        
+        if (!activeEnrollment) throw new Error('Could not create enrollment');
+
+        const target = activeEnrollment.config_snapshot?.target_amount || campaign.target_amount || 0;
+        const remainingToTarget = Math.max(0, target - activeEnrollment.total_spent);
+        
+        const appliedAmount = Math.min(remainingPurchaseAmount, remainingToTarget);
+        remainingPurchaseAmount -= appliedAmount;
+        
+        if (appliedAmount > 0) {
+          await supabase.from('transactions').insert({
+            enrollment_id: activeEnrollment.id,
+            merchant_id: merchant.id,
+            amount: appliedAmount,
+            qr_token: txnToken,
+          });
+        }
+        
+        const newTotalSpent = activeEnrollment.total_spent + appliedAmount;
+        // Visits increment once per scan on the first cycle it touches
+        const newTotalVisits = activeEnrollment.total_visits === 0 ? 1 : activeEnrollment.total_visits;
+
+        if (newTotalSpent >= target && target > 0) {
+          const claimCode = generateClaimCode();
+          await supabase.from('enrollments').update({
+            total_spent: newTotalSpent,
+            total_visits: newTotalVisits,
+            status: 'completed',
+            claim_code: claimCode
+          }).eq('id', activeEnrollment.id);
+          
+          cycleCompletions.push({ claimCode, reward: activeEnrollment.config_snapshot?.reward_description || campaign.reward_description || '' });
+          activeEnrollment = null; 
+        } else {
+          await supabase.from('enrollments').update({
+            total_spent: newTotalSpent,
+            total_visits: newTotalVisits
+          }).eq('id', activeEnrollment.id);
+          activeEnrollment.total_spent = newTotalSpent;
+          activeEnrollment.total_visits = newTotalVisits;
+          finalEnrollment = activeEnrollment;
+        }
+      }
+    } else {
+      // Visits Campaign: +1 visit, never cascades to multiple targets from a single scan
+      if (!activeEnrollment) {
+        latestCycleNumber++;
+        activeEnrollment = await createNewEnrollment(latestCycleNumber);
+        isFirstTransaction = true;
+      }
+      
+      if (!activeEnrollment) throw new Error('Could not create enrollment');
+      
+      const target = activeEnrollment.config_snapshot?.target_visits || campaign.target_visits || 0;
+      const newTotalVisits = activeEnrollment.total_visits + 1;
+      
+      await supabase.from('transactions').insert({
+        enrollment_id: activeEnrollment.id,
+        merchant_id: merchant.id,
+        amount: qrToken.amount,
+        qr_token: txnToken,
+      });
+
+      if (newTotalVisits >= target && target > 0) {
+        const claimCode = generateClaimCode();
+        await supabase.from('enrollments').update({
+          total_visits: newTotalVisits,
+          status: 'completed',
+          claim_code: claimCode
+        }).eq('id', activeEnrollment.id);
+        
+        cycleCompletions.push({ claimCode, reward: activeEnrollment.config_snapshot?.reward_description || campaign.reward_description || '' });
+        finalEnrollment = null;
+      } else {
+        await supabase.from('enrollments').update({
+          total_visits: newTotalVisits
+        }).eq('id', activeEnrollment.id);
+        activeEnrollment.total_visits = newTotalVisits;
+        finalEnrollment = activeEnrollment;
+      }
+    }
+  } catch (err: any) {
+    await sendWhatsAppMessage(senderNumber, err.message || 'Could not process your transaction.');
+    return;
+  }
+
+  // 8. Mark token used
+  await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken);
+
+  const customerName = customer.name || '';
   const campaignDesc = getCampaignDescription(
     campaign.campaign_type,
     campaign.target_amount,
@@ -300,50 +374,70 @@ export async function processTransaction(
     campaign.duration_days
   );
 
-  let replyText: string;
-
-  if (isCompleted) {
-    replyText = composeCompletionMessage(customerName, merchant.shop_name, campaign.reward_description, claimCode!);
-  } else if (isFirstTransaction) {
-    if (campaign.campaign_type === 'amount') {
-      replyText = composeWelcomeMessage(
-        customerName, merchant.shop_name, campaignDesc, campaign.reward_description,
-        formatDate(enrollment.deadline_at), qrToken.amount,
-        newTotalSpent, campaign.target_amount || 0, percentage, daysLeft
-      );
-    } else {
-      replyText = composeWelcomeVisitMessage(
-        customerName, merchant.shop_name, campaignDesc, campaign.reward_description,
-        formatDate(enrollment.deadline_at), newTotalVisits,
-        campaign.target_visits || 0, percentage, daysLeft
-      );
-    }
-  } else {
-    if (campaign.campaign_type === 'amount') {
-      replyText = composeTransactionMessage(
-        customerName, merchant.shop_name, qrToken.amount, newTotalSpent,
-        campaign.target_amount || 0, daysLeft, percentage
-      );
-    } else {
-      replyText = composeVisitMessage(
-        customerName, merchant.shop_name, newTotalVisits,
-        campaign.target_visits || 0, daysLeft, percentage
-      );
-    }
+  // Send completion messages for every completed cycle
+  for (const comp of cycleCompletions) {
+    const replyText = composeCompletionMessage(customerName, merchant.shop_name, comp.reward, comp.claimCode);
+    await sendWhatsAppMessage(senderNumber, replyText);
+    await supabase.from('message_logs').insert({
+      merchant_id: merchant.id,
+      customer_id: customer.id,
+      template_name: 'goal_completed',
+      category: 'service',
+      cost: 0,
+      status: 'sent',
+    });
   }
 
-  // 10. Send reply
-  await sendWhatsAppMessage(senderNumber, replyText);
+  // Send progress message if there is an active cycle left over (or if they didn't complete any)
+  if (finalEnrollment) {
+    const target = campaign.campaign_type === 'amount'
+      ? finalEnrollment.config_snapshot?.target_amount || campaign.target_amount || 0
+      : finalEnrollment.config_snapshot?.target_visits || campaign.target_visits || 0;
+    const current = campaign.campaign_type === 'amount' ? finalEnrollment.total_spent : finalEnrollment.total_visits;
+    const percentage = calcPercentage(current, target);
+    const daysLeft = daysRemaining(finalEnrollment.deadline_at);
+    
+    const isFirstWelcome = isFirstTransaction && cycleCompletions.length === 0;
 
-  // 11. Log
-  await supabase.from('message_logs').insert({
-    merchant_id: merchant.id,
-    customer_id: customer.id,
-    template_name: isCompleted ? 'goal_completed' : isFirstTransaction ? 'welcome' : 'transaction_update',
-    category: 'service',
-    cost: 0,
-    status: 'sent',
-  });
+    let replyText: string;
+    if (isFirstWelcome) {
+      if (campaign.campaign_type === 'amount') {
+        replyText = composeWelcomeMessage(
+          customerName, merchant.shop_name, campaignDesc, campaign.reward_description,
+          formatDate(finalEnrollment.deadline_at), qrToken.amount,
+          finalEnrollment.total_spent, target, percentage, daysLeft
+        );
+      } else {
+        replyText = composeWelcomeVisitMessage(
+          customerName, merchant.shop_name, campaignDesc, campaign.reward_description,
+          formatDate(finalEnrollment.deadline_at), finalEnrollment.total_visits,
+          target, percentage, daysLeft
+        );
+      }
+    } else {
+      if (campaign.campaign_type === 'amount') {
+        replyText = composeTransactionMessage(
+          customerName, merchant.shop_name, qrToken.amount, finalEnrollment.total_spent,
+          target, daysLeft, percentage
+        );
+      } else {
+        replyText = composeVisitMessage(
+          customerName, merchant.shop_name, finalEnrollment.total_visits,
+          target, daysLeft, percentage
+        );
+      }
+    }
+
+    await sendWhatsAppMessage(senderNumber, replyText);
+    await supabase.from('message_logs').insert({
+      merchant_id: merchant.id,
+      customer_id: customer.id,
+      template_name: isFirstWelcome ? 'welcome' : 'transaction_update',
+      category: 'service',
+      cost: 0,
+      status: 'sent',
+    });
+  }
 }
 
 export async function handleStatusCheck(
