@@ -41,14 +41,20 @@ export async function processPointsEarn(
   txnToken: string,
   senderNumber: string,
   customerNumber: string,
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  preloadedQrToken?: any,
+  preloadedMerchant?: any
 ): Promise<void> {
   // 1. Validate token
-  const { data: qrToken } = await supabase
-    .from('qr_tokens')
-    .select('*')
-    .eq('token', txnToken)
-    .single();
+  let qrToken = preloadedQrToken;
+  if (!qrToken) {
+    const { data } = await supabase
+      .from('qr_tokens')
+      .select('*')
+      .eq('token', txnToken)
+      .single();
+    qrToken = data;
+  }
 
   if (!qrToken) {
     await sendWhatsAppMessage(senderNumber, 'This QR is no longer valid. Please ask the shopkeeper for a new one.');
@@ -65,35 +71,39 @@ export async function processPointsEarn(
     return;
   }
 
-  // 2. Get merchant + points config
-  const { data: merchant } = await supabase
-    .from('merchants')
-    .select('*')
-    .eq('id', qrToken.merchant_id)
-    .single();
+  // 2. Get merchant + points config + customer
+  let merchant = preloadedMerchant;
+  if (!merchant) {
+    const { data } = await supabase
+      .from('merchants')
+      .select('*')
+      .eq('id', qrToken.merchant_id)
+      .single();
+    merchant = data;
+  }
 
   if (!merchant) {
     await sendWhatsAppMessage(senderNumber, 'Shop not found.');
     return;
   }
 
-  const { data: config } = await supabase
-    .from('points_config')
-    .select('*')
-    .eq('merchant_id', merchant.id)
-    .single();
+  const [{ data: config }, { data: customer }] = await Promise.all([
+    supabase
+      .from('points_config')
+      .select('*')
+      .eq('merchant_id', merchant.id)
+      .single(),
+    supabase
+      .from('customers')
+      .select('*')
+      .eq('whatsapp_number', customerNumber)
+      .single(),
+  ]);
 
   if (!config) {
     await sendWhatsAppMessage(senderNumber, 'Points program is not configured for this shop yet. Please inform the shopkeeper.');
     return;
   }
-
-  // 3. Find or create customer
-  const { data: customer } = await supabase
-    .from('customers')
-    .select('*')
-    .eq('whatsapp_number', customerNumber)
-    .single();
 
   if (!customer) {
     await sendWhatsAppMessage(senderNumber, 'Please scan the QR code at the shop first to register. 📱');
@@ -182,7 +192,7 @@ export async function processPointsEarn(
     return;
   }
 
-  // 9. Mark token used
+  // 9. Mark token used (MUST be before sendWhatsAppMessage)
   await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken);
 
   // 10. Send WhatsApp message
@@ -201,15 +211,15 @@ export async function processPointsEarn(
 
   await sendWhatsAppMessage(senderNumber, replyText);
 
-  // 11. Log message
-  await supabase.from('message_logs').insert({
+  // 11. Log message (non-blocking)
+  supabase.from('message_logs').insert({
     merchant_id: merchant.id,
     customer_id: customer.id,
     template_name: isFirstEarn ? 'points_welcome' : 'points_earn',
     category: 'service',
     cost: 0,
     status: 'sent',
-  });
+  }).catch(err => console.error('Failed to log message:', err));
 }
 
 /**
@@ -226,19 +236,19 @@ export async function processPointsRedeem(
   pointsToRedeem: number,
   supabase: SupabaseClient
 ): Promise<{ success: boolean; message: string; currencyValue?: number; newBalance?: number }> {
-  // 1. Get points config
-  const { data: config } = await supabase
-    .from('points_config')
-    .select('*')
-    .eq('merchant_id', merchantId)
-    .single();
+  // 1 & 2. Get points config & current balance in parallel
+  const [{ data: config }, currentBalance] = await Promise.all([
+    supabase
+      .from('points_config')
+      .select('*')
+      .eq('merchant_id', merchantId)
+      .single(),
+    getCustomerBalance(merchantId, customerId, supabase),
+  ]);
 
   if (!config) {
     return { success: false, message: 'Points config not found' };
   }
-
-  // 2. Get current balance
-  const currentBalance = await getCustomerBalance(merchantId, customerId, supabase);
 
   if (currentBalance <= 0) {
     return { success: false, message: 'No points balance to redeem' };
@@ -285,22 +295,23 @@ export async function processPointsRedeem(
   }
 
   // 7. Send WhatsApp to customer
-  const { data: customer } = await supabase
-    .from('customers')
-    .select('*')
-    .eq('id', customerId)
-    .single();
+  const [{ data: customer }, { data: merchant }] = await Promise.all([
+    supabase
+      .from('customers')
+      .select('*')
+      .eq('id', customerId)
+      .single(),
+    supabase
+      .from('merchants')
+      .select('shop_name')
+      .eq('id', merchantId)
+      .single(),
+  ]);
 
   if (customer) {
     const waNumber = customer.whatsapp_number.startsWith('91')
       ? customer.whatsapp_number
       : `91${customer.whatsapp_number}`;
-
-    const { data: merchant } = await supabase
-      .from('merchants')
-      .select('shop_name')
-      .eq('id', merchantId)
-      .single();
 
     const replyText = composePointsRedeemMessage(
       customer.name || '',
@@ -312,15 +323,15 @@ export async function processPointsRedeem(
 
     await sendWhatsAppMessage(waNumber, replyText);
 
-    // Log message
-    await supabase.from('message_logs').insert({
+    // Log message (non-blocking)
+    supabase.from('message_logs').insert({
       merchant_id: merchantId,
       customer_id: customerId,
       template_name: 'points_redeem',
       category: 'service',
       cost: 0,
       status: 'sent',
-    });
+    }).catch(err => console.error('Failed to log message:', err));
   }
 
   return {
@@ -340,21 +351,21 @@ export async function handlePointsStatusCheck(
   senderNumber: string,
   supabase: SupabaseClient
 ): Promise<void> {
-  const { data: merchant } = await supabase
-    .from('merchants')
-    .select('shop_name')
-    .eq('id', merchantId)
-    .single();
+  const [{ data: merchant }, currentBalance, { data: config }] = await Promise.all([
+    supabase
+      .from('merchants')
+      .select('shop_name')
+      .eq('id', merchantId)
+      .single(),
+    getCustomerBalance(merchantId, customerId, supabase),
+    supabase
+      .from('points_config')
+      .select('expiry_months')
+      .eq('merchant_id', merchantId)
+      .single(),
+  ]);
 
   if (!merchant) return;
-
-  const currentBalance = await getCustomerBalance(merchantId, customerId, supabase);
-
-  const { data: config } = await supabase
-    .from('points_config')
-    .select('expiry_months')
-    .eq('merchant_id', merchantId)
-    .single();
 
   let expiryText = '';
 
@@ -391,19 +402,19 @@ export async function handlePointsStatusCheck(
     ? senderNumber.substring(2)
     : senderNumber;
 
-  // Update last_whatsapp_at — customer just messaged us
-  await supabase
-    .from('customers')
-    .update({ last_whatsapp_at: new Date().toISOString() })
-    .eq('whatsapp_number', customerNumber);
-
-  // Log as service (free — customer initiated by tapping button)
-  await supabase.from('message_logs').insert({
-    merchant_id: merchantId,
-    customer_id: customerId,
-    template_name: 'status_check_reply',
-    category: 'service',
-    cost: 0,
-    status: 'sent',
-  });
+  // Update last_whatsapp_at & log message non-blocking
+  Promise.all([
+    supabase
+      .from('customers')
+      .update({ last_whatsapp_at: new Date().toISOString() })
+      .eq('whatsapp_number', customerNumber),
+    supabase.from('message_logs').insert({
+      merchant_id: merchantId,
+      customer_id: customerId,
+      template_name: 'status_check_reply',
+      category: 'service',
+      cost: 0,
+      status: 'sent',
+    }),
+  ]).catch(err => console.error('Failed post-reply points status check updates:', err));
 }

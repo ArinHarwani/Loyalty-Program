@@ -21,23 +21,25 @@ export async function processJoin(
   customerNumber: string,
   supabase: SupabaseClient
 ): Promise<void> {
-  const { data: merchant } = await supabase
-    .from('merchants')
-    .select('*')
-    .eq('merchant_code', merchantCode)
-    .single();
+  const [{ data: merchant }, { data: initialCustomer }] = await Promise.all([
+    supabase
+      .from('merchants')
+      .select('*')
+      .eq('merchant_code', merchantCode)
+      .single(),
+    supabase
+      .from('customers')
+      .select('*')
+      .eq('whatsapp_number', customerNumber)
+      .single(),
+  ]);
 
   if (!merchant) {
     await sendWhatsAppMessage(senderNumber, `Shop code "${merchantCode}" not found. Please check and try again.`);
     return;
   }
 
-  let { data: customer } = await supabase
-    .from('customers')
-    .select('*')
-    .eq('whatsapp_number', customerNumber)
-    .single();
-
+  let customer = initialCustomer;
   if (!customer) {
     const { data: newCustomer } = await supabase
       .from('customers')
@@ -72,14 +74,14 @@ export async function processJoin(
   await sendWhatsAppMessage(senderNumber, welcomeMsg);
 
   if (customer) {
-    await supabase.from('message_logs').insert({
+    supabase.from('message_logs').insert({
       merchant_id: merchant.id,
       customer_id: customer.id,
       template_name: 'join_welcome',
       category: 'service',
       cost: 0,
       status: 'sent',
-    });
+    }).catch(err => console.error('Failed to log message:', err));
   }
 }
 
@@ -87,14 +89,20 @@ export async function processTransaction(
   txnToken: string,
   senderNumber: string,
   customerNumber: string,
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  preloadedQrToken?: any,
+  preloadedMerchant?: any
 ): Promise<void> {
   // 1. Validate token
-  const { data: qrToken } = await supabase
-    .from('qr_tokens')
-    .select('*')
-    .eq('token', txnToken)
-    .single();
+  let qrToken = preloadedQrToken;
+  if (!qrToken) {
+    const { data } = await supabase
+      .from('qr_tokens')
+      .select('*')
+      .eq('token', txnToken)
+      .single();
+    qrToken = data;
+  }
 
   if (!qrToken) {
     await sendWhatsAppMessage(senderNumber, 'This QR is no longer valid. Please ask the shopkeeper for a new one.');
@@ -111,30 +119,33 @@ export async function processTransaction(
     return;
   }
 
-  // 2. Get merchant + campaign
-  const { data: merchant } = await supabase
-    .from('merchants')
-    .select('*')
-    .eq('id', qrToken.merchant_id)
-    .single();
+  // 2. Get merchant + campaign + customer in parallel
+  const merchantPromise = preloadedMerchant
+    ? Promise.resolve({ data: preloadedMerchant })
+    : supabase.from('merchants').select('*').eq('id', qrToken.merchant_id).single();
 
-  const { data: campaign } = await supabase
+  const campaignPromise = supabase
     .from('campaigns')
     .select('*')
     .eq('id', qrToken.campaign_id)
     .single();
 
-  if (!merchant || !campaign) {
-    await sendWhatsAppMessage(senderNumber, 'Campaign not found.');
-    return;
-  }
-
-  // 3. Find customer
-  const { data: customer } = await supabase
+  const customerPromise = supabase
     .from('customers')
     .select('*')
     .eq('whatsapp_number', customerNumber)
     .single();
+
+  const [{ data: merchant }, { data: campaign }, { data: customer }] = await Promise.all([
+    merchantPromise,
+    campaignPromise,
+    customerPromise,
+  ]);
+
+  if (!merchant || !campaign) {
+    await sendWhatsAppMessage(senderNumber, 'Campaign not found.');
+    return;
+  }
 
   if (!customer) {
     await sendWhatsAppMessage(
@@ -218,18 +229,19 @@ export async function processTransaction(
     const returnAmount = Math.abs(Number(qrToken.amount));
     const newTotalSpent = Math.max(0, Number(activeEnrollment.total_spent) - returnAmount);
 
-    // 5. Insert transaction
-    await supabase.from('transactions').insert({
-      enrollment_id: activeEnrollment.id,
-      merchant_id: merchant.id,
-      amount: qrToken.amount,
-      qr_token: txnToken,
-    });
-
-    await supabase
-      .from('enrollments')
-      .update({ total_spent: newTotalSpent })
-      .eq('id', activeEnrollment.id);
+    // 5. Insert transaction & update enrollment in parallel
+    await Promise.all([
+      supabase.from('transactions').insert({
+        enrollment_id: activeEnrollment.id,
+        merchant_id: merchant.id,
+        amount: qrToken.amount,
+        qr_token: txnToken,
+      }),
+      supabase
+        .from('enrollments')
+        .update({ total_spent: newTotalSpent })
+        .eq('id', activeEnrollment.id),
+    ]);
 
     const target = campaign.campaign_type === 'amount'
       ? activeEnrollment.config_snapshot?.target_amount || campaign.target_amount || 0
@@ -237,27 +249,29 @@ export async function processTransaction(
     const daysLeft = daysRemaining(activeEnrollment.deadline_at);
     
     const returnReply = `${merchant.shop_name} — Return Processed ↩\n\n−₹${returnAmount} adjusted from your total.\nUpdated total: ₹${newTotalSpent} / ₹${target}\n${daysLeft} days remaining`;
-    await sendWhatsAppMessage(senderNumber, returnReply);
+    
     await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken);
-    await supabase.from('message_logs').insert({
+    await sendWhatsAppMessage(senderNumber, returnReply);
+
+    supabase.from('message_logs').insert({
       merchant_id: merchant.id,
       customer_id: customer.id,
       template_name: 'return_processed',
       category: 'service',
       cost: 0,
       status: 'sent',
-    });
+    }).catch(err => console.error('Failed to log message:', err));
     return;
   }
 
   // Handle active enrollment deadline
   if (activeEnrollment && new Date(activeEnrollment.deadline_at) < new Date()) {
     await supabase.from('enrollments').update({ status: 'expired' }).eq('id', activeEnrollment.id);
+    await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken);
     await sendWhatsAppMessage(
       senderNumber,
       `⏰ Your loyalty enrollment at ${merchant.shop_name} has expired.\n\nScan the QR at your next visit to start fresh!`
     );
-    await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken);
     return;
   }
 
@@ -286,35 +300,46 @@ export async function processTransaction(
         const appliedAmount = Math.min(remainingPurchaseAmount, remainingToTarget);
         remainingPurchaseAmount -= appliedAmount;
         
-        if (appliedAmount > 0) {
-          await supabase.from('transactions').insert({
-            enrollment_id: activeEnrollment.id,
-            merchant_id: merchant.id,
-            amount: appliedAmount,
-            qr_token: txnToken,
-          });
-        }
-        
         const newTotalSpent = activeEnrollment.total_spent + appliedAmount;
         // Visits increment once per scan on the first cycle it touches
         const newTotalVisits = activeEnrollment.total_visits === 0 ? 1 : activeEnrollment.total_visits;
 
         if (newTotalSpent >= target && target > 0) {
           const claimCode = generateClaimCode();
-          await supabase.from('enrollments').update({
-            total_spent: newTotalSpent,
-            total_visits: newTotalVisits,
-            status: 'completed',
-            claim_code: claimCode
-          }).eq('id', activeEnrollment.id);
+          await Promise.all([
+            appliedAmount > 0
+              ? supabase.from('transactions').insert({
+                  enrollment_id: activeEnrollment.id,
+                  merchant_id: merchant.id,
+                  amount: appliedAmount,
+                  qr_token: txnToken,
+                })
+              : Promise.resolve(),
+            supabase.from('enrollments').update({
+              total_spent: newTotalSpent,
+              total_visits: newTotalVisits,
+              status: 'completed',
+              claim_code: claimCode
+            }).eq('id', activeEnrollment.id),
+          ]);
           
           cycleCompletions.push({ claimCode, reward: activeEnrollment.config_snapshot?.reward_description || campaign.reward_description || '' });
           activeEnrollment = null; 
         } else {
-          await supabase.from('enrollments').update({
-            total_spent: newTotalSpent,
-            total_visits: newTotalVisits
-          }).eq('id', activeEnrollment.id);
+          await Promise.all([
+            appliedAmount > 0
+              ? supabase.from('transactions').insert({
+                  enrollment_id: activeEnrollment.id,
+                  merchant_id: merchant.id,
+                  amount: appliedAmount,
+                  qr_token: txnToken,
+                })
+              : Promise.resolve(),
+            supabase.from('enrollments').update({
+              total_spent: newTotalSpent,
+              total_visits: newTotalVisits
+            }).eq('id', activeEnrollment.id),
+          ]);
           activeEnrollment.total_spent = newTotalSpent;
           activeEnrollment.total_visits = newTotalVisits;
           finalEnrollment = activeEnrollment;
@@ -333,27 +358,36 @@ export async function processTransaction(
       const target = activeEnrollment.config_snapshot?.target_visits || campaign.target_visits || 0;
       const newTotalVisits = activeEnrollment.total_visits + 1;
       
-      await supabase.from('transactions').insert({
-        enrollment_id: activeEnrollment.id,
-        merchant_id: merchant.id,
-        amount: qrToken.amount,
-        qr_token: txnToken,
-      });
-
       if (newTotalVisits >= target && target > 0) {
         const claimCode = generateClaimCode();
-        await supabase.from('enrollments').update({
-          total_visits: newTotalVisits,
-          status: 'completed',
-          claim_code: claimCode
-        }).eq('id', activeEnrollment.id);
+        await Promise.all([
+          supabase.from('transactions').insert({
+            enrollment_id: activeEnrollment.id,
+            merchant_id: merchant.id,
+            amount: qrToken.amount,
+            qr_token: txnToken,
+          }),
+          supabase.from('enrollments').update({
+            total_visits: newTotalVisits,
+            status: 'completed',
+            claim_code: claimCode
+          }).eq('id', activeEnrollment.id),
+        ]);
         
         cycleCompletions.push({ claimCode, reward: activeEnrollment.config_snapshot?.reward_description || campaign.reward_description || '' });
         finalEnrollment = null;
       } else {
-        await supabase.from('enrollments').update({
-          total_visits: newTotalVisits
-        }).eq('id', activeEnrollment.id);
+        await Promise.all([
+          supabase.from('transactions').insert({
+            enrollment_id: activeEnrollment.id,
+            merchant_id: merchant.id,
+            amount: qrToken.amount,
+            qr_token: txnToken,
+          }),
+          supabase.from('enrollments').update({
+            total_visits: newTotalVisits
+          }).eq('id', activeEnrollment.id),
+        ]);
         activeEnrollment.total_visits = newTotalVisits;
         finalEnrollment = activeEnrollment;
       }
@@ -363,7 +397,7 @@ export async function processTransaction(
     return;
   }
 
-  // 8. Mark token used
+  // 8. Mark token used (MUST be before sendWhatsAppMessage)
   await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken);
 
   const customerName = customer.name || '';
@@ -378,14 +412,14 @@ export async function processTransaction(
   for (const comp of cycleCompletions) {
     const replyText = composeCompletionMessage(customerName, merchant.shop_name, comp.reward, comp.claimCode);
     await sendWhatsAppMessage(senderNumber, replyText);
-    await supabase.from('message_logs').insert({
+    supabase.from('message_logs').insert({
       merchant_id: merchant.id,
       customer_id: customer.id,
       template_name: 'goal_completed',
       category: 'service',
       cost: 0,
       status: 'sent',
-    });
+    }).catch(err => console.error('Failed to log message:', err));
   }
 
   // Send progress message if there is an active cycle left over (or if they didn't complete any)
@@ -429,14 +463,14 @@ export async function processTransaction(
     }
 
     await sendWhatsAppMessage(senderNumber, replyText);
-    await supabase.from('message_logs').insert({
+    supabase.from('message_logs').insert({
       merchant_id: merchant.id,
       customer_id: customer.id,
       template_name: isFirstWelcome ? 'welcome' : 'transaction_update',
       category: 'service',
       cost: 0,
       status: 'sent',
-    });
+    }).catch(err => console.error('Failed to log message:', err));
   }
 }
 
@@ -509,21 +543,21 @@ ${daysLeft <= 3 ? '⚠️ Hurry! Your period ends very soon.' : 'Keep it up! �
   // Send free service window reply (not a template)
   await sendWhatsAppMessage(senderNumber, message);
 
-  // Update last_whatsapp_at — customer just messaged us
-  await supabase
-    .from('customers')
-    .update({ last_whatsapp_at: new Date().toISOString() })
-    .eq('whatsapp_number', customerNumber);
-
-  // Log as service (free — customer initiated by tapping button)
-  await supabase.from('message_logs').insert({
-    merchant_id: enrollment.merchant_id,
-    customer_id: enrollment.customer_id,
-    template_name: 'status_check_reply',
-    category: 'service',
-    cost: 0,
-    status: 'sent',
-  });
+  // Update last_whatsapp_at & log message in background (fire-and-forget)
+  Promise.all([
+    supabase
+      .from('customers')
+      .update({ last_whatsapp_at: new Date().toISOString() })
+      .eq('whatsapp_number', customerNumber),
+    supabase.from('message_logs').insert({
+      merchant_id: enrollment.merchant_id,
+      customer_id: enrollment.customer_id,
+      template_name: 'status_check_reply',
+      category: 'service',
+      cost: 0,
+      status: 'sent',
+    }),
+  ]).catch(err => console.error('Failed post-reply status check updates:', err));
 }
 
 

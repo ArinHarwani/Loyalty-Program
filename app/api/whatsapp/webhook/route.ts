@@ -135,21 +135,21 @@ export async function POST(request: NextRequest) {
       // --- Branch on merchant's loyalty mechanism ---
       const { data: qrToken } = await supabase
         .from('qr_tokens')
-        .select('merchant_id')
+        .select('*')
         .eq('token', txnToken)
         .single();
 
       if (qrToken) {
         const { data: merchant } = await supabase
           .from('merchants')
-          .select('loyalty_mechanism')
+          .select('*')
           .eq('id', qrToken.merchant_id)
           .single();
 
         if (merchant?.loyalty_mechanism === 'points') {
-          await processPointsEarn(txnToken, senderNumber, customerNumber, supabase);
+          await processPointsEarn(txnToken, senderNumber, customerNumber, supabase, qrToken, merchant);
         } else {
-          await processTransaction(txnToken, senderNumber, customerNumber, supabase);
+          await processTransaction(txnToken, senderNumber, customerNumber, supabase, qrToken, merchant);
         }
       } else {
         await sendWhatsAppMessage(senderNumber, 'This QR is no longer valid. Please ask the shopkeeper for a new one.');
