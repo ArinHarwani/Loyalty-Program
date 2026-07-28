@@ -74,14 +74,14 @@ export async function processJoin(
   await sendWhatsAppMessage(senderNumber, welcomeMsg);
 
   if (customer) {
-    supabase.from('message_logs').insert({
+    Promise.resolve(supabase.from('message_logs').insert({
       merchant_id: merchant.id,
       customer_id: customer.id,
       template_name: 'join_welcome',
       category: 'service',
       cost: 0,
       status: 'sent',
-    }).catch(err => console.error('Failed to log message:', err));
+    })).catch(err => console.error('Failed to log message:', err));
   }
 }
 
@@ -253,14 +253,14 @@ export async function processTransaction(
     await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken);
     await sendWhatsAppMessage(senderNumber, returnReply);
 
-    supabase.from('message_logs').insert({
+    Promise.resolve(supabase.from('message_logs').insert({
       merchant_id: merchant.id,
       customer_id: customer.id,
       template_name: 'return_processed',
       category: 'service',
       cost: 0,
       status: 'sent',
-    }).catch(err => console.error('Failed to log message:', err));
+    })).catch(err => console.error('Failed to log message:', err));
     return;
   }
 
@@ -412,14 +412,14 @@ export async function processTransaction(
   for (const comp of cycleCompletions) {
     const replyText = composeCompletionMessage(customerName, merchant.shop_name, comp.reward, comp.claimCode);
     await sendWhatsAppMessage(senderNumber, replyText);
-    supabase.from('message_logs').insert({
+    Promise.resolve(supabase.from('message_logs').insert({
       merchant_id: merchant.id,
       customer_id: customer.id,
       template_name: 'goal_completed',
       category: 'service',
       cost: 0,
       status: 'sent',
-    }).catch(err => console.error('Failed to log message:', err));
+    })).catch(err => console.error('Failed to log message:', err));
   }
 
   // Send progress message if there is an active cycle left over (or if they didn't complete any)
@@ -463,14 +463,14 @@ export async function processTransaction(
     }
 
     await sendWhatsAppMessage(senderNumber, replyText);
-    supabase.from('message_logs').insert({
+    Promise.resolve(supabase.from('message_logs').insert({
       merchant_id: merchant.id,
       customer_id: customer.id,
       template_name: isFirstWelcome ? 'welcome' : 'transaction_update',
       category: 'service',
       cost: 0,
       status: 'sent',
-    }).catch(err => console.error('Failed to log message:', err));
+    })).catch(err => console.error('Failed to log message:', err));
   }
 }
 
@@ -545,18 +545,18 @@ ${daysLeft <= 3 ? '⚠️ Hurry! Your period ends very soon.' : 'Keep it up! �
 
   // Update last_whatsapp_at & log message in background (fire-and-forget)
   Promise.all([
-    supabase
+    Promise.resolve(supabase
       .from('customers')
       .update({ last_whatsapp_at: new Date().toISOString() })
-      .eq('whatsapp_number', customerNumber),
-    supabase.from('message_logs').insert({
+      .eq('whatsapp_number', customerNumber)),
+    Promise.resolve(supabase.from('message_logs').insert({
       merchant_id: enrollment.merchant_id,
       customer_id: enrollment.customer_id,
       template_name: 'status_check_reply',
       category: 'service',
       cost: 0,
       status: 'sent',
-    }),
+    })),
   ]).catch(err => console.error('Failed post-reply status check updates:', err));
 }
 
