@@ -225,14 +225,18 @@ export async function processPointsEarn(
 
   // 11. Log message (non-blocking)
   after(async () => {
-    await supabase.from('message_logs').insert({
-      merchant_id: merchant.id,
-      customer_id: customer.id,
-      template_name: isFirstEarn ? 'points_welcome' : 'points_earn',
-      category: 'service',
-      cost: 0,
-      status: 'sent',
-    }).catch((err: unknown) => console.error('Failed to log message:', err));
+    try {
+      await supabase.from('message_logs').insert({
+        merchant_id: merchant.id,
+        customer_id: customer.id,
+        template_name: isFirstEarn ? 'points_welcome' : 'points_earn',
+        category: 'service',
+        cost: 0,
+        status: 'sent',
+      });
+    } catch (err) {
+      console.error('Failed to log message:', err);
+    }
   });
 }
 
@@ -339,14 +343,18 @@ export async function processPointsRedeem(
 
     // Log message (non-blocking)
     after(async () => {
-      await supabase.from('message_logs').insert({
-        merchant_id: merchantId,
-        customer_id: customerId,
-        template_name: 'points_redeem',
-        category: 'service',
-        cost: 0,
-        status: 'sent',
-      }).catch((err: unknown) => console.error('Failed to log message:', err));
+      try {
+        await supabase.from('message_logs').insert({
+          merchant_id: merchantId,
+          customer_id: customerId,
+          template_name: 'points_redeem',
+          category: 'service',
+          cost: 0,
+          status: 'sent',
+        });
+      } catch (err) {
+        console.error('Failed to log message:', err);
+      }
     });
   }
 
@@ -420,19 +428,23 @@ export async function handlePointsStatusCheck(
 
   // Update last_whatsapp_at & log message non-blocking
   after(async () => {
-    await Promise.all([
-      supabase
-        .from('customers')
-        .update({ last_whatsapp_at: new Date().toISOString() })
-        .eq('whatsapp_number', customerNumber),
-      supabase.from('message_logs').insert({
-        merchant_id: merchantId,
-        customer_id: customerId,
-        template_name: 'status_check_reply',
-        category: 'service',
-        cost: 0,
-        status: 'sent',
-      }),
-    ]).catch((err: unknown) => console.error('Failed post-reply points status check updates:', err));
+    try {
+      await Promise.all([
+        supabase
+          .from('customers')
+          .update({ last_whatsapp_at: new Date().toISOString() })
+          .eq('whatsapp_number', customerNumber),
+        supabase.from('message_logs').insert({
+          merchant_id: merchantId,
+          customer_id: customerId,
+          template_name: 'status_check_reply',
+          category: 'service',
+          cost: 0,
+          status: 'sent',
+        }),
+      ]);
+    } catch (err) {
+      console.error('Failed post-reply points status check updates:', err);
+    }
   });
 }
