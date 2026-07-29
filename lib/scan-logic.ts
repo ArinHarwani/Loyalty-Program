@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { after } from 'next/server';
 import {
   sendWhatsAppMessage,
   composeWelcomeMessage,
@@ -74,14 +75,16 @@ export async function processJoin(
   await sendWhatsAppMessage(senderNumber, welcomeMsg);
 
   if (customer) {
-    Promise.resolve(supabase.from('message_logs').insert({
-      merchant_id: merchant.id,
-      customer_id: customer.id,
-      template_name: 'join_welcome',
-      category: 'service',
-      cost: 0,
-      status: 'sent',
-    })).catch(err => console.error('Failed to log message:', err));
+    after(() =>
+      supabase.from('message_logs').insert({
+        merchant_id: merchant.id,
+        customer_id: customer.id,
+        template_name: 'join_welcome',
+        category: 'service',
+        cost: 0,
+        status: 'sent',
+      }).then(() => {}, err => console.error('Failed to log message:', err))
+    );
   }
 }
 
@@ -249,25 +252,52 @@ export async function processTransaction(
     const daysLeft = daysRemaining(activeEnrollment.deadline_at);
     
     const returnReply = `${merchant.shop_name} — Return Processed ↩\n\n−₹${returnAmount} adjusted from your total.\nUpdated total: ₹${newTotalSpent} / ₹${target}\n${daysLeft} days remaining`;
-    
-    await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken);
+
+    const { data: claimedToken1 } = await supabase
+      .from('qr_tokens')
+      .update({ used: true })
+      .eq('token', txnToken)
+      .eq('used', false)
+      .select()
+      .single();
+
+    if (!claimedToken1) {
+      await sendWhatsAppMessage(senderNumber, 'This QR code has already been used.');
+      return;
+    }
+
     await sendWhatsAppMessage(senderNumber, returnReply);
 
-    Promise.resolve(supabase.from('message_logs').insert({
-      merchant_id: merchant.id,
-      customer_id: customer.id,
-      template_name: 'return_processed',
-      category: 'service',
-      cost: 0,
-      status: 'sent',
-    })).catch(err => console.error('Failed to log message:', err));
+    after(() =>
+      supabase.from('message_logs').insert({
+        merchant_id: merchant.id,
+        customer_id: customer.id,
+        template_name: 'return_processed',
+        category: 'service',
+        cost: 0,
+        status: 'sent',
+      }).then(() => {}, err => console.error('Failed to log message:', err))
+    );
     return;
   }
 
   // Handle active enrollment deadline
   if (activeEnrollment && new Date(activeEnrollment.deadline_at) < new Date()) {
     await supabase.from('enrollments').update({ status: 'expired' }).eq('id', activeEnrollment.id);
-    await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken);
+
+    const { data: claimedToken2 } = await supabase
+      .from('qr_tokens')
+      .update({ used: true })
+      .eq('token', txnToken)
+      .eq('used', false)
+      .select()
+      .single();
+
+    if (!claimedToken2) {
+      await sendWhatsAppMessage(senderNumber, 'This QR code has already been used.');
+      return;
+    }
+
     await sendWhatsAppMessage(
       senderNumber,
       `⏰ Your loyalty enrollment at ${merchant.shop_name} has expired.\n\nScan the QR at your next visit to start fresh!`
@@ -397,8 +427,19 @@ export async function processTransaction(
     return;
   }
 
-  // 8. Mark token used (MUST be before sendWhatsAppMessage)
-  await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken);
+  // 8. Mark token used (MUST be before sendWhatsAppMessage) — atomic claim
+  const { data: claimedToken3 } = await supabase
+    .from('qr_tokens')
+    .update({ used: true })
+    .eq('token', txnToken)
+    .eq('used', false)
+    .select()
+    .single();
+
+  if (!claimedToken3) {
+    await sendWhatsAppMessage(senderNumber, 'This QR code has already been used.');
+    return;
+  }
 
   const customerName = customer.name || '';
   const campaignDesc = getCampaignDescription(
@@ -412,14 +453,16 @@ export async function processTransaction(
   for (const comp of cycleCompletions) {
     const replyText = composeCompletionMessage(customerName, merchant.shop_name, comp.reward, comp.claimCode);
     await sendWhatsAppMessage(senderNumber, replyText);
-    Promise.resolve(supabase.from('message_logs').insert({
-      merchant_id: merchant.id,
-      customer_id: customer.id,
-      template_name: 'goal_completed',
-      category: 'service',
-      cost: 0,
-      status: 'sent',
-    })).catch(err => console.error('Failed to log message:', err));
+    after(() =>
+      supabase.from('message_logs').insert({
+        merchant_id: merchant.id,
+        customer_id: customer.id,
+        template_name: 'goal_completed',
+        category: 'service',
+        cost: 0,
+        status: 'sent',
+      }).then(() => {}, err => console.error('Failed to log message:', err))
+    );
   }
 
   // Send progress message if there is an active cycle left over (or if they didn't complete any)
@@ -463,14 +506,16 @@ export async function processTransaction(
     }
 
     await sendWhatsAppMessage(senderNumber, replyText);
-    Promise.resolve(supabase.from('message_logs').insert({
-      merchant_id: merchant.id,
-      customer_id: customer.id,
-      template_name: isFirstWelcome ? 'welcome' : 'transaction_update',
-      category: 'service',
-      cost: 0,
-      status: 'sent',
-    })).catch(err => console.error('Failed to log message:', err));
+    after(() =>
+      supabase.from('message_logs').insert({
+        merchant_id: merchant.id,
+        customer_id: customer.id,
+        template_name: isFirstWelcome ? 'welcome' : 'transaction_update',
+        category: 'service',
+        cost: 0,
+        status: 'sent',
+      }).then(() => {}, err => console.error('Failed to log message:', err))
+    );
   }
 }
 
@@ -544,20 +589,22 @@ ${daysLeft <= 3 ? '⚠️ Hurry! Your period ends very soon.' : 'Keep it up! �
   await sendWhatsAppMessage(senderNumber, message);
 
   // Update last_whatsapp_at & log message in background (fire-and-forget)
-  Promise.all([
-    Promise.resolve(supabase
-      .from('customers')
-      .update({ last_whatsapp_at: new Date().toISOString() })
-      .eq('whatsapp_number', customerNumber)),
-    Promise.resolve(supabase.from('message_logs').insert({
-      merchant_id: enrollment.merchant_id,
-      customer_id: enrollment.customer_id,
-      template_name: 'status_check_reply',
-      category: 'service',
-      cost: 0,
-      status: 'sent',
-    })),
-  ]).catch(err => console.error('Failed post-reply status check updates:', err));
+  after(() =>
+    Promise.all([
+      supabase
+        .from('customers')
+        .update({ last_whatsapp_at: new Date().toISOString() })
+        .eq('whatsapp_number', customerNumber),
+      supabase.from('message_logs').insert({
+        merchant_id: enrollment.merchant_id,
+        customer_id: enrollment.customer_id,
+        template_name: 'status_check_reply',
+        category: 'service',
+        cost: 0,
+        status: 'sent',
+      }),
+    ]).then(() => {}, err => console.error('Failed post-reply status check updates:', err))
+  );
 }
 
 

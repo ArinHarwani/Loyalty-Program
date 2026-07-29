@@ -5,6 +5,7 @@
 // ============================================================
 
 import { SupabaseClient } from '@supabase/supabase-js';
+import { after } from 'next/server';
 import {
   sendWhatsAppMessage,
   composePointsWelcomeMessage,
@@ -114,7 +115,7 @@ export async function processPointsEarn(
   const billAmount = Number(qrToken.amount);
   if (billAmount <= 0) {
     await sendWhatsAppMessage(senderNumber, 'Returns are not supported for the points system.');
-    await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken);
+    await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken).eq('used', false);
     return;
   }
 
@@ -123,7 +124,7 @@ export async function processPointsEarn(
       senderNumber,
       `Minimum purchase of ₹${config.min_bill_amount} is required to earn points at ${merchant.shop_name}.`
     );
-    await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken);
+    await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken).eq('used', false);
     return;
   }
 
@@ -148,7 +149,7 @@ export async function processPointsEarn(
           senderNumber,
           "We're sorry, but this shop has reached its maximum loyalty capacity. Please ask the shopkeeper to upgrade their plan."
         );
-        await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken);
+        await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken).eq('used', false);
         return;
       }
     }
@@ -164,7 +165,7 @@ export async function processPointsEarn(
       senderNumber,
       `Transaction recorded at ${merchant.shop_name}, but the amount was too small to earn points.`
     );
-    await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken);
+    await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken).eq('used', false);
     return;
   }
 
@@ -192,8 +193,19 @@ export async function processPointsEarn(
     return;
   }
 
-  // 9. Mark token used (MUST be before sendWhatsAppMessage)
-  await supabase.from('qr_tokens').update({ used: true }).eq('token', txnToken);
+  // 9. Mark token used (MUST be before sendWhatsAppMessage) — atomic claim
+  const { data: claimedToken } = await supabase
+    .from('qr_tokens')
+    .update({ used: true })
+    .eq('token', txnToken)
+    .eq('used', false)
+    .select()
+    .single();
+
+  if (!claimedToken) {
+    await sendWhatsAppMessage(senderNumber, 'This QR code has already been used.');
+    return;
+  }
 
   // 10. Send WhatsApp message
   const customerName = customer.name || '';
@@ -212,14 +224,16 @@ export async function processPointsEarn(
   await sendWhatsAppMessage(senderNumber, replyText);
 
   // 11. Log message (non-blocking)
-  Promise.resolve(supabase.from('message_logs').insert({
-    merchant_id: merchant.id,
-    customer_id: customer.id,
-    template_name: isFirstEarn ? 'points_welcome' : 'points_earn',
-    category: 'service',
-    cost: 0,
-    status: 'sent',
-  })).catch(err => console.error('Failed to log message:', err));
+  after(() =>
+    supabase.from('message_logs').insert({
+      merchant_id: merchant.id,
+      customer_id: customer.id,
+      template_name: isFirstEarn ? 'points_welcome' : 'points_earn',
+      category: 'service',
+      cost: 0,
+      status: 'sent',
+    }).then(() => {}, err => console.error('Failed to log message:', err))
+  );
 }
 
 /**
@@ -324,14 +338,16 @@ export async function processPointsRedeem(
     await sendWhatsAppMessage(waNumber, replyText);
 
     // Log message (non-blocking)
-    Promise.resolve(supabase.from('message_logs').insert({
-      merchant_id: merchantId,
-      customer_id: customerId,
-      template_name: 'points_redeem',
-      category: 'service',
-      cost: 0,
-      status: 'sent',
-    })).catch(err => console.error('Failed to log message:', err));
+    after(() =>
+      supabase.from('message_logs').insert({
+        merchant_id: merchantId,
+        customer_id: customerId,
+        template_name: 'points_redeem',
+        category: 'service',
+        cost: 0,
+        status: 'sent',
+      }).then(() => {}, err => console.error('Failed to log message:', err))
+    );
   }
 
   return {
@@ -403,18 +419,20 @@ export async function handlePointsStatusCheck(
     : senderNumber;
 
   // Update last_whatsapp_at & log message non-blocking
-  Promise.all([
-    Promise.resolve(supabase
-      .from('customers')
-      .update({ last_whatsapp_at: new Date().toISOString() })
-      .eq('whatsapp_number', customerNumber)),
-    Promise.resolve(supabase.from('message_logs').insert({
-      merchant_id: merchantId,
-      customer_id: customerId,
-      template_name: 'status_check_reply',
-      category: 'service',
-      cost: 0,
-      status: 'sent',
-    })),
-  ]).catch(err => console.error('Failed post-reply points status check updates:', err));
+  after(() =>
+    Promise.all([
+      supabase
+        .from('customers')
+        .update({ last_whatsapp_at: new Date().toISOString() })
+        .eq('whatsapp_number', customerNumber),
+      supabase.from('message_logs').insert({
+        merchant_id: merchantId,
+        customer_id: customerId,
+        template_name: 'status_check_reply',
+        category: 'service',
+        cost: 0,
+        status: 'sent',
+      }),
+    ]).then(() => {}, err => console.error('Failed post-reply points status check updates:', err))
+  );
 }
